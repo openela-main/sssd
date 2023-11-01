@@ -1,0 +1,29 @@
+From 897ccf40b2e7ab30c3b8a3fb42584d1d5b8c4bb3 Mon Sep 17 00:00:00 2001
+From: Alexey Tikhonov <atikhono@redhat.com>
+Date: Fri, 13 Jan 2023 18:58:05 +0100
+Subject: [PATCH] MAN: mention `attributes` in 'see also'
+
+Reviewed-by: Justin Stephenson <jstephen@redhat.com>
+Reviewed-by: Sumit Bose <sbose@redhat.com>
+(cherry picked from commit b631c3174a3f8f5c169e9507969015dd79fdfd80)
+---
+ src/man/include/seealso.xml | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/src/man/include/seealso.xml b/src/man/include/seealso.xml
+index 9999496fa..7f0bbe9df 100644
+--- a/src/man/include/seealso.xml
++++ b/src/man/include/seealso.xml
+@@ -10,6 +10,9 @@
+             <citerefentry>
+                 <refentrytitle>sssd-ldap</refentrytitle><manvolnum>5</manvolnum>
+             </citerefentry>,
++            <citerefentry>
++                <refentrytitle>sssd-ldap-attributes</refentrytitle><manvolnum>5</manvolnum>
++            </citerefentry>,
+             <citerefentry>
+                 <refentrytitle>sssd-krb5</refentrytitle><manvolnum>5</manvolnum>
+             </citerefentry>,
+-- 
+2.37.3
+
