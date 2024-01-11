@@ -18,8 +18,8 @@
 %global enable_systemtap_opt --enable-systemtap
 
 Name: sssd
-Version: 2.8.2
-Release: 3%{?dist}
+Version: 2.9.1
+Release: 4%{?dist}
 Group: Applications/System
 Summary: System Security Services Daemon
 License: GPLv3+
@@ -27,13 +27,11 @@ URL: https://github.com/SSSD/sssd
 Source0: https://github.com/SSSD/sssd/releases/download/%{version}/sssd-%{version}.tar.gz
 
 ### Patches ###
-Patch0001: 0001-ldap-update-shadow-last-change-in-sysdb-as-well.patch
-Patch0002: 0002-SSS_CLIENT-fix-error-codes-returned-by-common-read-w.patch
-Patch0003: 0003-SSS_CLIENT-if-poll-returns-POLLNVAL-then-socket-is-a.patch
-Patch0004: 0004-PAM_SSS-close-sss_cli_sd-should-also-be-protected-wi.patch
-Patch0005: 0005-watchdog-add-arm_watchdog-and-disarm_watchdog-calls.patch
-Patch0006: 0006-sbus-arm-watchdog-for-sbus_connect_init_send.patch
-Patch0007: 0007-sysdb-fix-string-comparison-when-checking-for-overri.patch
+Patch0001: 0001-watchdog-add-arm_watchdog-and-disarm_watchdog-calls.patch
+Patch0002: 0002-sbus-arm-watchdog-for-sbus_connect_init_send.patch
+Patch0003: 0003-mc-recover-from-invalid-memory-cache-size.patch
+Patch0004: 0004-sss_iface-do-not-add-cli_id-to-chain-key.patch
+Patch0005: 0005-MC-a-couple-of-additions-to-recover-from-invalid-mem.patch
 
 ### Downstream Patches ###
 
@@ -217,7 +215,6 @@ Summary: Userspace tools for use with the SSSD
 Group: Applications/System
 License: GPLv3+
 Requires: sssd-common = %{version}-%{release}
-Requires: libsss_simpleifp = %{version}-%{release}
 # required by sss_obfuscate
 Requires: python3-sss = %{version}-%{release}
 Requires: python3-sssdconfig = %{version}-%{release}
@@ -597,6 +594,8 @@ autoreconf -ivf
     --with-initscript=systemd \
     --with-syslog=journald \
     --with-subid \
+    --with-files-provider \
+    --with-libsifp \
     --enable-sss-default-nss-plugin \
     --without-python2-bindings \
     --with-sssd-user=sssd \
@@ -913,7 +912,7 @@ done
 %{_mandir}/man5/sssd-ifp.5*
 %{_unitdir}/sssd-ifp.service
 # InfoPipe DBus plumbing
-%{_sysconfdir}/dbus-1/system.d/org.freedesktop.sssd.infopipe.conf
+%{_datadir}/dbus-1/system.d/org.freedesktop.sssd.infopipe.conf
 %{_datadir}/dbus-1/system-services/org.freedesktop.sssd.infopipe.service
 
 %files -n libsss_simpleifp
@@ -1216,9 +1215,45 @@ fi
 %systemd_postun_with_restart sssd.service
 
 %changelog
-* Mon Jul 10 2023 Alexey Tikhonov <atikhono@redhat.com> - 2.8.2-3
-- Resolves: rhbz#2219351 - [sssd] SSSD enters failed state after heavy load in the system [rhel-8.8.0.z]
-- Resolves: rhbz#2196838 - [sssd] User lookup on IPA client fails with 's2n get_fqlist request failed' [rhel-8.8.0.z]
+* Mon Oct 03 2023 Eduardo Lima (Etrunko) <etrunko@redhat.com> - 2.9.1-4
+- Related: rhbz#2236414 - dbus and crond getting terminated with SIGBUS in sss_client code
+  Handle all invalidations consistently
+  Supply a valid pointer to `sss_mmap_cache_validate_or_reinit()`, not a pointer to a local var
+
+* Tue Sep 12 2023 Eduardo Lima (Etrunko) <etrunko@redhat.com> - 2.9.1-3
+- Resolves: rhbz#2236414 - dbus and crond getting terminated with SIGBUS in sss_client code
+- Resolves: rhbz#2237302 - SSSD runs multiples lookup search for each NFS request (SBUS req chaining stopped working in sssd-2.7)
+
+* Mon Jul 10 2023 Alexey Tikhonov <atikhono@redhat.com> - 2.9.1-2
+- Resolves: rhbz#2149241 - [sssd] SSSD enters failed state after heavy load in the system
+
+* Fri Jun 23 2023 Alexey Tikhonov <atikhono@redhat.com> - 2.9.1-1
+- Resolves: rhbz#2167836 - Rebase SSSD for RHEL 8.9
+- Resolves: rhbz#2196521 - [RHEL8] sssd : AD user login problem when modify ldap_user_name= name and restricted by GPO Policy
+- Resolves: rhbz#2195919 - sssd-be tends to run out of system resources, hitting the maximum number of open files
+- Resolves: rhbz#2192708 - [RHEL8] [sssd] User lookup on IPA client fails with 's2n get_fqlist request failed'
+- Resolves: rhbz#2139467 - [RHEL8] sssd attempts LDAP password modify extended op after BIND failure
+- Resolves: rhbz#2054825 - sssd_be segfault at 0 ip 00007f16b5fcab7e sp 00007fffc1cc0988 error 4 in libc-2.28.so[7f16b5e72000+1bc000]
+- Resolves: rhbz#2189583 - [sssd] RHEL 8.9 Tier 0 Localization
+- Resolves: rhbz#2170720 - [RHEL8] When adding attributes in sssd.conf that we have already, the cross-forest query just stop working
+- Resolves: rhbz#2096183 - BE_REQ_USER_AND_GROUP LDAP search filter can inadvertently catch multiple overrides
+- Resolves: rhbz#2151450 - [RHEL8] SSSD missing group membership when evaluating GPO policy with 'auto_private_groups = true'
+
+* Tue May 30 2023 Alexey Tikhonov <atikhono@redhat.com> - 2.9.0-4
+- Related: rhbz#2190417 - Rebase Samba to the latest 4.18.x release
+  Rebuild against rebased Samba libs
+
+* Thu May 25 2023 Alexey Tikhonov <atikhono@redhat.com> - 2.9.0-3
+- Resolves: rhbz#2167836 - Rebase SSSD for RHEL 8.9
+
+* Mon May 15 2023 Alexey Tikhonov <atikhono@redhat.com> - 2.9.0-1
+- Resolves: rhbz#2167836 - Rebase SSSD for RHEL 8.9
+- Resolves: rhbz#2101489 - [sssd] Auth fails if client cannot speak to forest root domain (ldap_sasl_interactive_bind_s failed)
+- Resolves: rhbz#2143925 - kinit switches KCM away from the newly issued ticket
+- Resolves: rhbz#2151403 - AD user is not found on IPA client after upgrading to RHEL8.7
+- Resolves: rhbz#2164805 - man page entry should make clear that a nested group needs a name
+- Resolves: rhbz#2170484 - Unable to lookup AD user from child domain (or "make filtering of the domains more configurable")
+- Resolves: rhbz#2180981 - sss allows extraneous @ characters prefixed to username #
 
 * Mon Feb 13 2023 Alexey Tikhonov <atikhono@redhat.com> - 2.8.2-2
 - Resolves: rhbz#2149091 - Update to sssd-2.7.3-4.el8_7.1.x86_64 resulted in "Request to sssd failed. Device or resource busy"
