@@ -1,7 +1,7 @@
 From 55564defec8fdbb4d9df6b0124a8b18b31743230 Mon Sep 17 00:00:00 2001
 From: Sumit Bose <sbose@redhat.com>
 Date: Fri, 9 Jun 2023 13:01:47 +0200
-Subject: [PATCH 6/6] sbus: arm watchdog for sbus_connect_init_send()
+Subject: [PATCH 2/2] sbus: arm watchdog for sbus_connect_init_send()
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit

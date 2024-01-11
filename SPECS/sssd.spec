@@ -26,20 +26,20 @@
 %global samba_package_version %(rpm -q samba-devel --queryformat %{version}-%{release})
 
 Name: sssd
-Version: 2.8.2
-Release: 3%{?dist}
+Version: 2.9.1
+Release: 4%{?dist}
 Summary: System Security Services Daemon
 License: GPLv3+
 URL: https://github.com/SSSD/sssd/
 Source0: https://github.com/SSSD/sssd/releases/download/%{version}/sssd-%{version}.tar.gz
 
 ### Patches ###
-Patch0001: 0001-ldap-update-shadow-last-change-in-sysdb-as-well.patch
-Patch0002: 0002-MAN-mention-attributes-in-see-also.patch
-Patch0003: 0003-SSS_CLIENT-delete-key-in-lib-destructor.patch
-Patch0004: 0004-watchdog-add-arm_watchdog-and-disarm_watchdog-calls.patch
-Patch0005: 0005-sbus-arm-watchdog-for-sbus_connect_init_send.patch
-Patch0006: 0006-sysdb-fix-string-comparison-when-checking-for-overri.patch
+Patch0001: 0001-watchdog-add-arm_watchdog-and-disarm_watchdog-calls.patch
+Patch0002: 0002-sbus-arm-watchdog-for-sbus_connect_init_send.patch
+Patch0003: 0003-mc-recover-from-invalid-memory-cache-size.patch
+Patch0004: 0004-sss_iface-do-not-add-cli_id-to-chain-key.patch
+Patch0005: 0005-BUILD-Accept-krb5-1.21-for-building-the-PAC-plugin.patch
+Patch0006: 0006-MC-a-couple-of-additions-to-recover-from-invalid-mem.patch
 
 ### Dependencies ###
 
@@ -526,8 +526,9 @@ autoreconf -ivf
     --with-syslog=journald \
     --with-test-dir=/dev/shm \
     --with-subid \
+    --with-files-provider \
+    --with-libsifp \
 %if 0%{?fedora}
-    --enable-files-domain \
     --disable-polkit-rules-path \
 %endif
     %{nil}
@@ -833,7 +834,7 @@ done
 %{_mandir}/man5/sssd-ifp.5*
 %{_unitdir}/sssd-ifp.service
 # InfoPipe DBus plumbing
-%{_sysconfdir}/dbus-1/system.d/org.freedesktop.sssd.infopipe.conf
+%{_datadir}/dbus-1/system.d/org.freedesktop.sssd.infopipe.conf
 %{_datadir}/dbus-1/system-services/org.freedesktop.sssd.infopipe.service
 
 %files -n libsss_simpleifp
@@ -1065,9 +1066,47 @@ fi
 %systemd_postun_with_restart sssd.service
 
 %changelog
-* Mon Jul 10 2023 Alexey Tikhonov <atikhono@redhat.com> - 2.8.2-3
-- Resolves: rhbz#2219353 - [sssd] SSSD enters failed state after heavy load in the system [rhel-9.2.0.z]
-- Resolves: rhbz#2196839 - [sssd] User lookup on IPA client fails with 's2n get_fqlist request failed' [rhel-9.2.0.z]
+* Mon Oct 03 2023 Eduardo Lima (Etrunko) <etrunko@redhat.com> - 2.9.1-4
+- Related: rhbz#2236236 - dbus and crond getting terminated with SIGBUS in sss_client code
+  Handle all invalidations consistently
+  Supply a valid pointer to `sss_mmap_cache_validate_or_reinit()`, not a pointer to a local var
+
+* Tue Sep 12 2023 Eduardo Lima (Etrunko) <etrunko@redhat.com> - 2.9.1-3
+- Resolves: rhbz#2236236 - dbus and crond getting terminated with SIGBUS in sss_client code
+- Resolves: rhbz#2237301 - SSSD runs multiples lookup search for each NFS request (SBUS req chaining stopped working in sssd-2.7)
+
+* Mon Jul 10 2023 Alexey Tikhonov <atikhono@redhat.com> - 2.9.1-2
+- Resolves: rhbz#2218858 - [sssd] SSSD enters failed state after heavy load in the system
+
+* Fri Jun 23 2023 Alexey Tikhonov <atikhono@redhat.com> - 2.9.1-1
+- Resolves: rhbz#2167837 - Rebase SSSD for RHEL 9.3
+- Resolves: rhbz#2196816 - [RHEL9] [sssd] User lookup on IPA client fails with 's2n get_fqlist request failed'
+- Resolves: rhbz#2162552 - sssd client caches old data after removing netgroup member on IDM
+- Resolves: rhbz#2189542 - [sssd] RHEL 9.3 Tier 0 Localization
+- Resolves: rhbz#2133854 - [RHEL9] In some cases when `sdap_add_incomplete_groups()` is called with `ignore_group_members = true`, groups should be treated as complete
+- Resolves: rhbz#1765354 - [RFE] - Show password expiration warning when IdM users login with SSH keys
+
+* Tue Jun  6 2023 Alexey Tikhonov <atikhono@redhat.com> - 2.9.0-5
+- Related: rhbz#2190415 - Rebase Samba to the latest 4.18.x release
+  Rebuild against rebased Samba libs.
+
+* Tue May 30 2023 Alexey Tikhonov <atikhono@redhat.com> - 2.9.0-4
+- Related: rhbz#2190415 - Rebase Samba to the latest 4.18.x release
+  Rebuild against rebased Samba libs.
+
+* Thu May 25 2023 Alexey Tikhonov <atikhono@redhat.com> - 2.9.0-3
+- Resolves: rhbz#2167837 - Rebase SSSD for RHEL 9.3
+
+* Mon May 15 2023 Alexey Tikhonov <atikhono@redhat.com> - 2.9.0-1
+- Resolves: rhbz#2167837 - Rebase SSSD for RHEL 9.3
+- Resolves: rhbz#1765354 - [RFE] - Show password expiration warning when IdM users login with SSH keys
+- Resolves: rhbz#1913839 - filter_groups doesn't filter GID from 'id' output: AD + 'ldap_id_mapping = True' corner case
+- Resolves: rhbz#2100789 - [Improvement] sssctl config-check command does not show an error when we don't have id_provider in the domain section
+- Resolves: rhbz#2152177 - [RFE] Add support for ldapi:// URLs
+- Resolves: rhbz#2164852 - man page entry should make clear that a nested group needs a name
+- Resolves: rhbz#2166627 - Improvement: sss_client: add 'getsidbyusername()' and 'getsidbygroupname()' and corresponding python bindings
+- Resolves: rhbz#2166943 - kinit switches KCM away from the newly issued ticket
+- Resolves: rhbz#2167728 - [sssd] Auth fails if client cannot speak to forest root domain (ldap_sasl_interactive_bind_s failed)
 
 * Mon Jan 16 2023 Alexey Tikhonov <atikhono@redhat.com> - 2.8.2-2
 - Resolves: rhbz#2160001 - Reference to 'sssd-ldap-attributes' man page is missing in 'sssd-ldap', etc man pages
