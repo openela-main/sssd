@@ -1,0 +1,90 @@
+From 45a5630e0cfe95ab90bf4a7dd1b32f418c4c759e Mon Sep 17 00:00:00 2001
+From: Alexey Tikhonov <atikhono@redhat.com>
+Date: Fri, 23 Dec 2022 16:36:58 +0100
+Subject: [PATCH] SSS_CLIENT: delete key in lib destructor
+
+pthread_key_delete() disables thread at-exit destructors.
+Otherwise an attempt to execute already unloaded `sss_at_thread_exit()`
+would trigger segfault.
+
+This doesn't solve an issue with leaking on `dlclose()` FDs initialized in
+multiple threads, but better than crash.
+
+Resolves: https://github.com/SSSD/sssd/issues/6505
+
+Reviewed-by: Iker Pedrosa <ipedrosa@redhat.com>
+Reviewed-by: Sumit Bose <sbose@redhat.com>
+(cherry picked from commit 08ccd23fb2c831d6ea918a59b777a0073d414858)
+---
+ src/sss_client/common.c | 24 +++++++++++++++++++-----
+ 1 file changed, 19 insertions(+), 5 deletions(-)
+
+diff --git a/src/sss_client/common.c b/src/sss_client/common.c
+index d762dff49..2c888faa9 100644
+--- a/src/sss_client/common.c
++++ b/src/sss_client/common.c
+@@ -27,6 +27,7 @@
+ #include <nss.h>
+ #include <security/pam_modules.h>
+ #include <errno.h>
++#include <stdatomic.h>
+ #include <sys/types.h>
+ #include <sys/socket.h>
+ #include <sys/un.h>
+@@ -63,7 +64,8 @@
+ 
+ #ifdef HAVE_PTHREAD_EXT
+ static pthread_key_t sss_sd_key;
+-static pthread_once_t sss_sd_key_initialized = PTHREAD_ONCE_INIT;
++static pthread_once_t sss_sd_key_init = PTHREAD_ONCE_INIT;
++static atomic_bool sss_sd_key_initialized = false;
+ static __thread int sss_cli_sd = -1; /* the sss client socket descriptor */
+ static __thread struct stat sss_cli_sb; /* the sss client stat buffer */
+ #else
+@@ -71,9 +73,6 @@ static int sss_cli_sd = -1; /* the sss client socket descriptor */
+ static struct stat sss_cli_sb; /* the sss client stat buffer */
+ #endif
+ 
+-#if HAVE_FUNCTION_ATTRIBUTE_DESTRUCTOR
+-__attribute__((destructor))
+-#endif
+ void sss_cli_close_socket(void)
+ {
+     if (sss_cli_sd != -1) {
+@@ -91,9 +90,24 @@ static void sss_at_thread_exit(void *v)
+ static void init_sd_key(void)
+ {
+     pthread_key_create(&sss_sd_key, sss_at_thread_exit);
++    sss_sd_key_initialized = true;
++}
++#endif
++
++#if HAVE_FUNCTION_ATTRIBUTE_DESTRUCTOR
++__attribute__((destructor)) void sss_at_lib_unload(void)
++{
++#ifdef HAVE_PTHREAD_EXT
++    if (sss_sd_key_initialized) {
++        sss_sd_key_initialized = false;
++        pthread_key_delete(sss_sd_key);
++    }
++#endif
++    sss_cli_close_socket();
+ }
+ #endif
+ 
++
+ /* Requests:
+  *
+  * byte 0-3: 32bit unsigned with length (the complete packet length: 0 to X)
+@@ -572,7 +586,7 @@ static int sss_cli_open_socket(int *errnop, const char *socket_name, int timeout
+     }
+ 
+ #ifdef HAVE_PTHREAD_EXT
+-    pthread_once(&sss_sd_key_initialized, init_sd_key); /* once for all threads */
++    pthread_once(&sss_sd_key_init, init_sd_key); /* once for all threads */
+ 
+     /* It actually doesn't matter what value to set for a key.
+      * The only important thing: key must be non-NULL to ensure
+-- 
+2.37.3
+
