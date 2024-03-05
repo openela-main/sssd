@@ -19,7 +19,7 @@
 
 Name: sssd
 Version: 2.9.1
-Release: 4%{?dist}
+Release: 4%{?dist}.5
 Group: Applications/System
 Summary: System Security Services Daemon
 License: GPLv3+
@@ -32,6 +32,17 @@ Patch0002: 0002-sbus-arm-watchdog-for-sbus_connect_init_send.patch
 Patch0003: 0003-mc-recover-from-invalid-memory-cache-size.patch
 Patch0004: 0004-sss_iface-do-not-add-cli_id-to-chain-key.patch
 Patch0005: 0005-MC-a-couple-of-additions-to-recover-from-invalid-mem.patch
+Patch0006: 0006-DP-reduce-log-level-in-case-a-responder-asks-for-unk.patch
+Patch0007: 0007-SSS_CLIENT-MC-in-case-mem-cache-file-validation-fail.patch
+Patch0008: 0008-SSS_CLIENT-check-if-mem-cache-fd-was-hijacked.patch
+Patch0009: 0009-SSS_CLIENT-check-if-reponder-socket-was-hijacked.patch
+Patch0010: 0010-LDAP-make-groups_by_user_send-recv-public.patch
+Patch0011: 0011-ad-gpo-evalute-host-groups.patch
+Patch0012: 0012-sysdb-remove-sysdb_computer.-ch.patch
+Patch0013: 0013-sdap-add-set_non_posix-parameter.patch
+Patch0014: 0014-ipa-Add-BUILD_PASSKEY-conditional-for-passkey-codepa.patch
+Patch0015: 0015-pam-Conditionalize-passkey-code.patch
+Patch0016: 0016-Makefile-Respect-BUILD_PASSKEY-conditional.patch
 
 ### Downstream Patches ###
 
@@ -1215,7 +1226,17 @@ fi
 %systemd_postun_with_restart sssd.service
 
 %changelog
-* Mon Oct 03 2023 Eduardo Lima (Etrunko) <etrunko@redhat.com> - 2.9.1-4
+* Wed Jan 10 2024 Alexey Tikhonov <atikhono@redhat.com> - 2.9.1-4.5
+- Resolves: RHEL-21164 - Make sure 8.9.z/9.3.z doesn't build 'passkey' code [rhel-8.9.0.z]
+
+* Tue Jan  9 2024 Alexey Tikhonov <atikhono@redhat.com> - 2.9.1-4.3
+- Resolves: RHEL-21085 - SSSD GPO lacks group resolution on hosts [rhel-8.9.0.z]
+
+* Tue Jan  2 2024 Alexey Tikhonov <atikhono@redhat.com> - 2.9.1-4.2
+- Resolves: RHEL-19212 - Excessive logging to sssd_nss and sssd_be in multi-domain AD forest [rhel-8.9.0.z]
+- Resolves: RHEL-19994 - latest sssd breaks logging in via XDMCP for LDAP/Kerberos users [rhel-8.9.0.z]
+
+* Tue Oct 03 2023 Eduardo Lima (Etrunko) <etrunko@redhat.com> - 2.9.1-4
 - Related: rhbz#2236414 - dbus and crond getting terminated with SIGBUS in sss_client code
   Handle all invalidations consistently
   Supply a valid pointer to `sss_mmap_cache_validate_or_reinit()`, not a pointer to a local var
