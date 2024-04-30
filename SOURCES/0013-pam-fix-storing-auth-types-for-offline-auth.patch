@@ -1,0 +1,57 @@
+From 163db8465e815984abac0ba9af097589045791da Mon Sep 17 00:00:00 2001
+From: Sumit Bose <sbose@redhat.com>
+Date: Fri, 22 Mar 2024 19:53:29 +0100
+Subject: [PATCH] pam: fix storing auth types for offline auth
+
+Before the recent patches which allow krb5_child to iterate over all
+available authentication methods typically only one method was returned.
+E.g. is Smartcard authentication (pkinit) was possible it was typically
+the first method the in question list and the result of the
+answer_pkinit() function was immediately returned. As a result only the
+Smartcard authentication type was set and a missing password
+authentication type while others were present might have been a
+reasonable indicator for the online state.
+
+With the recent patches, all available methods, including password
+authentication if available, are return and a new indicator is needed.
+---
+ src/responder/pam/pamsrv.h     | 1 +
+ src/responder/pam/pamsrv_cmd.c | 3 ++-
+ 2 files changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/src/responder/pam/pamsrv.h b/src/responder/pam/pamsrv.h
+index 618836189..2aa14ae02 100644
+--- a/src/responder/pam/pamsrv.h
++++ b/src/responder/pam/pamsrv.h
+@@ -114,6 +114,7 @@ struct pam_resp_auth_type {
+     bool otp_auth;
+     bool cert_auth;
+     bool passkey_auth;
++    bool backend_returned_no_auth_type;
+ };
+ 
+ struct sss_cmd_table *get_pam_cmds(void);
+diff --git a/src/responder/pam/pamsrv_cmd.c b/src/responder/pam/pamsrv_cmd.c
+index 13ba13131..94895d48e 100644
+--- a/src/responder/pam/pamsrv_cmd.c
++++ b/src/responder/pam/pamsrv_cmd.c
+@@ -915,6 +915,7 @@ errno_t pam_get_auth_types(struct pam_data *pd,
+         /* If the backend cannot determine which authentication types are
+          * available the default would be to prompt for a password. */
+         types.password_auth = true;
++        types.backend_returned_no_auth_type = true;
+     }
+ 
+     DEBUG(SSSDBG_TRACE_ALL, "Authentication types for user [%s] and service "
+@@ -1002,7 +1003,7 @@ static errno_t pam_eval_local_auth_policy(TALLOC_CTX *mem_ctx,
+             }
+ 
+             /* Store the local auth types, in case we go offline */
+-            if (!auth_types.password_auth) {
++            if (!auth_types.backend_returned_no_auth_type) {
+                 ret = set_local_auth_type(preq, sc_allow, passkey_allow);
+                 if (ret != EOK) {
+                     DEBUG(SSSDBG_FATAL_FAILURE,
+-- 
+2.42.0
+

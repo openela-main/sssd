@@ -27,7 +27,7 @@
 
 Name: sssd
 Version: 2.9.4
-Release: 2%{?dist}
+Release: 6%{?dist}
 Summary: System Security Services Daemon
 License: GPLv3+
 URL: https://github.com/SSSD/sssd/
@@ -38,6 +38,17 @@ Patch0001: 0001-sssd-adding-mail-as-case-insensitive.patch
 Patch0002: 0002-sdap-add-search_bases-option-to-groups_by_user_send.patch
 Patch0003: 0003-sdap-add-naming_context-as-new-member-of-struct-sdap.patch
 Patch0004: 0004-pam-fix-SC-auth-with-multiple-certs-and-missing-logi.patch
+Patch0005: 0005-sss-client-handle-key-value-in-destructor.patch
+Patch0006: 0006-krb5-Allow-fallback-between-responder-questions.patch
+Patch0007: 0007-krb5-Add-fallback-password-change-support.patch
+Patch0008: 0008-pam-fix-invalid-if-condition.patch
+Patch0009: 0009-krb5-add-OTP-to-krb5-response-selection.patch
+Patch0010: 0010-krb5-make-sure-answer_pkinit-use-matching-debug-mess.patch
+Patch0011: 0011-krb5-make-prompter-and-pre-auth-debug-message-less-i.patch
+Patch0012: 0012-pam_sss-prefer-Smartcard-authentication.patch
+Patch0013: 0013-pam-fix-storing-auth-types-for-offline-auth.patch
+Patch0014: 0014-ad-gpo-use-hash-to-store-intermediate-results.patch
+Patch0015: 0015-tests-Drop-extensions-from-openssl-command-if-there-.patch
 
 ### Dependencies ###
 
@@ -1087,6 +1098,19 @@ fi
 %systemd_postun_with_restart sssd.service
 
 %changelog
+* Thu Apr 18 2024 Alexey Tikhonov <atikhono@redhat.com> - 2.9.4-6
+- Resolves: RHEL-27209 - Race condition during authorization leads to GPO policies functioning inconsistently [rhel-9.4.0]
+
+* Mon Mar 25 2024 Alexey Tikhonov <atikhono@redhat.com> - 2.9.4-5
+- Resolves: RHEL-28161 - Passkey cannot fall back to password
+
+* Thu Mar 21 2024 Alexey Tikhonov <atikhono@redhat.com> - 2.9.4-4
+- Resolves: RHEL-28161 - Passkey cannot fall back to password
+
+* Wed Mar 13 2024 Alexey Tikhonov <atikhono@redhat.com> - 2.9.4-3
+- Resolves: RHEL-22340 - socket leak
+- Resolves: RHEL-28161 - Passkey cannot fall back to password
+
 * Mon Feb 12 2024 Alexey Tikhonov <atikhono@redhat.com> - 2.9.4-2
 - Resolves: RHEL-12503 - AD users are unable to log in due to case sensitivity of user because the domain is found as an alias to the email address. 
 - Resolves: RHEL-22288 - ssh pubkey stored in ldap/AD no longer works to authenticate via sssd
