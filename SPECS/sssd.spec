@@ -26,32 +26,18 @@
 %global samba_package_version %(rpm -q samba-devel --queryformat %{version}-%{release})
 
 Name: sssd
-Version: 2.9.1
-Release: 4%{?dist}.5
+Version: 2.9.4
+Release: 2%{?dist}
 Summary: System Security Services Daemon
 License: GPLv3+
 URL: https://github.com/SSSD/sssd/
 Source0: https://github.com/SSSD/sssd/releases/download/%{version}/sssd-%{version}.tar.gz
 
 ### Patches ###
-Patch0001: 0001-watchdog-add-arm_watchdog-and-disarm_watchdog-calls.patch
-Patch0002: 0002-sbus-arm-watchdog-for-sbus_connect_init_send.patch
-Patch0003: 0003-mc-recover-from-invalid-memory-cache-size.patch
-Patch0004: 0004-sss_iface-do-not-add-cli_id-to-chain-key.patch
-Patch0005: 0005-BUILD-Accept-krb5-1.21-for-building-the-PAC-plugin.patch
-Patch0006: 0006-MC-a-couple-of-additions-to-recover-from-invalid-mem.patch
-Patch0007: 0007-SSS_CLIENT-replace-__thread-with-pthread_-specific.patch
-Patch0008: 0008-DP-reduce-log-level-in-case-a-responder-asks-for-unk.patch
-Patch0009: 0009-SSS_CLIENT-MC-in-case-mem-cache-file-validation-fail.patch
-Patch0010: 0010-SSS_CLIENT-check-if-mem-cache-fd-was-hijacked.patch
-Patch0011: 0011-SSS_CLIENT-check-if-reponder-socket-was-hijacked.patch
-Patch0012: 0012-LDAP-make-groups_by_user_send-recv-public.patch
-Patch0013: 0013-ad-gpo-evalute-host-groups.patch
-Patch0014: 0014-sysdb-remove-sysdb_computer.-ch.patch
-Patch0015: 0015-sdap-add-set_non_posix-parameter.patch
-Patch0016: 0016-ipa-Add-BUILD_PASSKEY-conditional-for-passkey-codepa.patch
-Patch0017: 0017-pam-Conditionalize-passkey-code.patch
-Patch0018: 0018-Makefile-Respect-BUILD_PASSKEY-conditional.patch
+Patch0001: 0001-sssd-adding-mail-as-case-insensitive.patch
+Patch0002: 0002-sdap-add-search_bases-option-to-groups_by_user_send.patch
+Patch0003: 0003-sdap-add-naming_context-as-new-member-of-struct-sdap.patch
+Patch0004: 0004-pam-fix-SC-auth-with-multiple-certs-and-missing-logi.patch
 
 ### Dependencies ###
 
@@ -101,6 +87,7 @@ BuildRequires: krb5-devel
 BuildRequires: krb5-libs >= 1.18.2-11
 BuildRequires: libcmocka-devel >= 1.0.0
 BuildRequires: libdhash-devel >= 0.4.2
+BuildRequires: libfido2-devel
 BuildRequires: libini_config-devel >= 1.1
 BuildRequires: libldb-devel >= %{ldb_version}
 BuildRequires: libnfsidmap-devel
@@ -341,6 +328,7 @@ identity data from and authenticate against an Active Directory server.
 Summary: The proxy back end of the SSSD
 License: GPLv3+
 Requires: sssd-common = %{version}-%{release}
+Requires: libsss_certmap = %{version}-%{release}
 
 %description proxy
 Provides the proxy back end which can be used to wrap an existing NSS and/or
@@ -509,6 +497,16 @@ This package provides Kerberos plugins that are required to enable
 authentication against external identity providers. Additionally a helper
 program to handle the OAuth 2.0 Device Authorization Grant is provided.
 
+%package passkey
+Summary: SSSD helpers and plugins needed for authentication with passkey token
+License: GPLv3+
+Requires: sssd-common = %{version}-%{release}
+Requires: libfido2
+
+%description passkey
+This package provides helper processes and Kerberos plugins that are required to
+enable authentication with passkey token.
+
 %prep
 %autosetup -p1
 
@@ -540,6 +538,7 @@ autoreconf -ivf
     --with-subid \
     --with-files-provider \
     --with-libsifp \
+    --with-passkey \
 %if 0%{?fedora}
     --disable-polkit-rules-path \
 %endif
@@ -583,6 +582,10 @@ cp $RPM_BUILD_ROOT/%{_datadir}/sssd-kcm/kcm_default_ccache \
 # Enable krb5 idp plugins by default (when sssd-idp package is installed)
 cp $RPM_BUILD_ROOT/%{_datadir}/sssd/krb5-snippets/sssd_enable_idp \
    $RPM_BUILD_ROOT/%{_sysconfdir}/krb5.conf.d/sssd_enable_idp
+
+# Enable krb5 passkey plugins by default (when sssd-passkey package is installed)
+cp $RPM_BUILD_ROOT/%{_datadir}/sssd/krb5-snippets/sssd_enable_passkey \
+   $RPM_BUILD_ROOT/%{_sysconfdir}/krb5.conf.d/sssd_enable_passkey
 
 # krb5 configuration snippet
 cp $RPM_BUILD_ROOT/%{_datadir}/sssd/krb5-snippets/enable_sssd_conf_dir \
@@ -989,6 +992,12 @@ done
 %{_datadir}/sssd/krb5-snippets/sssd_enable_idp
 %config(noreplace) %{_sysconfdir}/krb5.conf.d/sssd_enable_idp
 
+%files passkey
+%attr(755,%{sssd_user},%{sssd_user}) %{_libexecdir}/%{servicename}/passkey_child
+%{_libdir}/%{name}/modules/sssd_krb5_passkey_plugin.so
+%{_datadir}/sssd/krb5-snippets/sssd_enable_passkey
+%config(noreplace) %{_sysconfdir}/krb5.conf.d/sssd_enable_passkey
+
 %if 0%{?rhel}
 %pre common
 getent group sssd >/dev/null || groupadd -r sssd
@@ -1078,27 +1087,39 @@ fi
 %systemd_postun_with_restart sssd.service
 
 %changelog
-* Wed Jan 10 2024 Alexey Tikhonov <atikhono@redhat.com> - 2.9.1-4.5
-- Resolves: RHEL-21165 - Make sure 8.9.z/9.3.z doesn't build 'passkey' code [rhel-9.3.0.z]
+* Mon Feb 12 2024 Alexey Tikhonov <atikhono@redhat.com> - 2.9.4-2
+- Resolves: RHEL-12503 - AD users are unable to log in due to case sensitivity of user because the domain is found as an alias to the email address. 
+- Resolves: RHEL-22288 - ssh pubkey stored in ldap/AD no longer works to authenticate via sssd
+- Resolves: RHEL-22194 - gdm smartcard login fails with sssd-2.9.3 in case of multiple identities
 
-* Tue Jan  9 2024 Alexey Tikhonov <atikhono@redhat.com> - 2.9.1-4.3
-- Resolves: RHEL-21089 - SSSD GPO lacks group resolution on hosts [rhel-9.3.0.z]
+* Fri Jan 12 2024 Alexey Tikhonov <atikhono@redhat.com> - 2.9.4-1
+- Resolves: RHEL-2632 - Rebase SSSD for RHEL 9.4
+- Resolves: RHEL-18395 - latest sssd breaks logging in via XDMCP for LDAP/Kerberos users
+- Resolves: RHEL-17498 - New sssd.conf seems not to be backwards compatible (wrt SmartCard auth of local users using 'files provider') [rhel-9]
+- Resolves: RHEL-21079 - SSSD GPO lacks group resolution on hosts [rhel-9]
+- Resolves: RHEL-19211 - Excessive logging to sssd_nss and sssd_be in multi-domain AD forest [rhel-9]
 
-* Tue Jan  2 2024 Alexey Tikhonov <atikhono@redhat.com> - 2.9.1-4.2
-- Resolves: RHEL-19213 - Excessive logging to sssd_nss and sssd_be in multi-domain AD forest [rhel-9.3.0.z]
-- Resolves: RHEL-19993 - latest sssd breaks logging in via XDMCP for LDAP/Kerberos users [rhel-9.3.0.z]
+* Mon Nov 13 2023 Alexey Tikhonov <atikhono@redhat.com> - 2.9.3-2
+- Resolves: RHEL-2632 - Rebase SSSD for RHEL 9.4
 
-* Sat Nov 11 2023 Alexey Tikhonov <atikhono@redhat.com> - 2.9.1-4.1
-- Resolves: RHEL-15431 - HANA validation on RHEL 9.2 issue possibly related to libc/nss_sss behaviour [rhel-9.3.0.z]
+* Mon Nov 13 2023 Alexey Tikhonov <atikhono@redhat.com> - 2.9.3-1
+- Resolves: RHEL-2632 - Rebase SSSD for RHEL 9.4
+- Resolves: RHEL-14427 - Expected cn in RDN, got uid
+- Resolves: RHEL-12229 - HANA validation on RHEL 9.2 issue possibly related to libc/nss_sss behaviour
+- Resolves: RHEL-3925 - SSSD goes offline when, while reading a single user, misses a required attribute (i.e. SID)
+- Resolves: RHEL-2319 - Passkey authentication for centrally managed users
+- Resolves: RHEL-4146 - Incorrect handling of reverse IPv6 update results in update failure
+- Resolves: RHEL-4971 - sssd-kcm does not appear to expire Kerberos tickets (RFE: sssd_kcm should have the option to automatically delete the expired tickets)
 
-* Mon Oct 02 2023 Eduardo Lima (Etrunko) <etrunko@redhat.com> - 2.9.1-4
-- Related: rhbz#2236236 - dbus and crond getting terminated with SIGBUS in sss_client code
-  Handle all invalidations consistently
-  Supply a valid pointer to `sss_mmap_cache_validate_or_reinit()`, not a pointer to a local var
+* Thu Oct  5 2023 Alexey Tikhonov <atikhono@redhat.com> - 2.9.2-2
+- Resolves: RHEL-2319 - Passkey authentication for centrally managed users
 
-* Tue Sep 12 2023 Eduardo Lima (Etrunko) <etrunko@redhat.com> - 2.9.1-3
-- Resolves: rhbz#2236236 - dbus and crond getting terminated with SIGBUS in sss_client code
-- Resolves: rhbz#2237301 - SSSD runs multiples lookup search for each NFS request (SBUS req chaining stopped working in sssd-2.7)
+* Fri Sep  8 2023 Alexey Tikhonov <atikhono@redhat.com> - 2.9.2-1
+- Resolves: RHEL-2632 - Rebase SSSD for RHEL 9.4
+- Resolves: RHEL-2319 - Passkey authentication for centrally managed users
+- Resolves: rhbz#2234829 - SSSD runs multiples lookup search for each NFS request (SBUS req chaining stopped working)
+- Resolves: rhbz#2236119 - dbus and crond getting terminated with SIGBUS in sss_client code
+
 
 * Mon Jul 10 2023 Alexey Tikhonov <atikhono@redhat.com> - 2.9.1-2
 - Resolves: rhbz#2218858 - [sssd] SSSD enters failed state after heavy load in the system
