@@ -18,8 +18,8 @@
 %global enable_systemtap_opt --enable-systemtap
 
 Name: sssd
-Version: 2.9.1
-Release: 4%{?dist}.5
+Version: 2.9.4
+Release: 2%{?dist}
 Group: Applications/System
 Summary: System Security Services Daemon
 License: GPLv3+
@@ -27,22 +27,10 @@ URL: https://github.com/SSSD/sssd
 Source0: https://github.com/SSSD/sssd/releases/download/%{version}/sssd-%{version}.tar.gz
 
 ### Patches ###
-Patch0001: 0001-watchdog-add-arm_watchdog-and-disarm_watchdog-calls.patch
-Patch0002: 0002-sbus-arm-watchdog-for-sbus_connect_init_send.patch
-Patch0003: 0003-mc-recover-from-invalid-memory-cache-size.patch
-Patch0004: 0004-sss_iface-do-not-add-cli_id-to-chain-key.patch
-Patch0005: 0005-MC-a-couple-of-additions-to-recover-from-invalid-mem.patch
-Patch0006: 0006-DP-reduce-log-level-in-case-a-responder-asks-for-unk.patch
-Patch0007: 0007-SSS_CLIENT-MC-in-case-mem-cache-file-validation-fail.patch
-Patch0008: 0008-SSS_CLIENT-check-if-mem-cache-fd-was-hijacked.patch
-Patch0009: 0009-SSS_CLIENT-check-if-reponder-socket-was-hijacked.patch
-Patch0010: 0010-LDAP-make-groups_by_user_send-recv-public.patch
-Patch0011: 0011-ad-gpo-evalute-host-groups.patch
-Patch0012: 0012-sysdb-remove-sysdb_computer.-ch.patch
-Patch0013: 0013-sdap-add-set_non_posix-parameter.patch
-Patch0014: 0014-ipa-Add-BUILD_PASSKEY-conditional-for-passkey-codepa.patch
-Patch0015: 0015-pam-Conditionalize-passkey-code.patch
-Patch0016: 0016-Makefile-Respect-BUILD_PASSKEY-conditional.patch
+Patch0001: 0001-sssd-adding-mail-as-case-insensitive.patch
+Patch0002: 0002-sdap-add-search_bases-option-to-groups_by_user_send.patch
+Patch0003: 0003-sdap-add-naming_context-as-new-member-of-struct-sdap.patch
+Patch0004: 0004-pam-fix-SC-auth-with-multiple-certs-and-missing-logi.patch
 
 ### Downstream Patches ###
 
@@ -366,6 +354,7 @@ Group: Applications/System
 License: GPLv3+
 Conflicts: sssd < 1.10.0-8.beta2
 Requires: sssd-common = %{version}-%{release}
+Requires: libsss_certmap = %{version}-%{release}
 Requires(pre): shadow-utils
 
 %description proxy
@@ -1226,24 +1215,35 @@ fi
 %systemd_postun_with_restart sssd.service
 
 %changelog
-* Wed Jan 10 2024 Alexey Tikhonov <atikhono@redhat.com> - 2.9.1-4.5
-- Resolves: RHEL-21164 - Make sure 8.9.z/9.3.z doesn't build 'passkey' code [rhel-8.9.0.z]
+* Mon Feb 12 2024 Alexey Tikhonov <atikhono@redhat.com> - 2.9.4-2
+- Resolves: RHEL-25064 - AD users are unable to log in due to case sensitivity of user because the domain is found as an alias to the email address. [rhel-8]
+- Resolves: RHEL-25066 - gdm smartcard login fails with sssd-2.9.3 in case of multiple identities [rhel-8]
+- Resolves: RHEL-25065 - ssh pubkey stored in ldap/AD no longer works to authenticate via sssd [rhel-8]
 
-* Tue Jan  9 2024 Alexey Tikhonov <atikhono@redhat.com> - 2.9.1-4.3
-- Resolves: RHEL-21085 - SSSD GPO lacks group resolution on hosts [rhel-8.9.0.z]
+* Sat Jan 13 2024 Alexey Tikhonov <atikhono@redhat.com> - 2.9.4-1
+- Resolves: RHEL-2630 - Rebase SSSD for RHEL 8.10
+- Resolves: RHEL-1680 - auto_private_groups does not create cache in IPA server SSSD cache
+- Resolves: RHEL-10092 - logfile rotation for sssd_kcm not working properly, sssd_kcm never receives a 'kill -HUP'
+- Resolves: RHEL-17495 - New sssd.conf seems not to be backwards compatible (wrt SmartCard auth of local users using 'files provider')
+- Resolves: RHEL-18431 - Excessive logging to sssd_nss and sssd_be in multi-domain AD forest
+- Resolves: RHEL-5033 - Incorrect IdM product name in man sssd.conf
+- Resolves: RHEL-15368 - SSSD GPO lacks group resolution on hosts [rhel-8]
+- Resolves: RHEL-10721 - very bad performance when requesting service tickets
+- Resolves: RHEL-19011 - Invalid handling groups from child domain
+- Resolves: RHEL-19949 - latest sssd breaks logging in via XDMCP for LDAP/Kerberos users [rhel-8]
 
-* Tue Jan  2 2024 Alexey Tikhonov <atikhono@redhat.com> - 2.9.1-4.2
-- Resolves: RHEL-19212 - Excessive logging to sssd_nss and sssd_be in multi-domain AD forest [rhel-8.9.0.z]
-- Resolves: RHEL-19994 - latest sssd breaks logging in via XDMCP for LDAP/Kerberos users [rhel-8.9.0.z]
+* Mon Nov 13 2023 Alexey Tikhonov <atikhono@redhat.com> - 2.9.3-2
+- Resolves: RHEL-2630 - Rebase SSSD for RHEL 8.10
 
-* Tue Oct 03 2023 Eduardo Lima (Etrunko) <etrunko@redhat.com> - 2.9.1-4
-- Related: rhbz#2236414 - dbus and crond getting terminated with SIGBUS in sss_client code
-  Handle all invalidations consistently
-  Supply a valid pointer to `sss_mmap_cache_validate_or_reinit()`, not a pointer to a local var
+* Mon Nov 13 2023 Alexey Tikhonov <atikhono@redhat.com> - 2.9.3-1
+- Resolves: RHEL-2630 - Rebase SSSD for RHEL 8.10
+- Resolves: RHEL-14070 - sssd-2.9.2-1.el8 breaks smart card authentication
+- Resolves: RHEL-3665 - Unexplainable error "Unable to find primary gid [2]: No such file or directory" when SSSD performs lookup for an AD user
 
-* Tue Sep 12 2023 Eduardo Lima (Etrunko) <etrunko@redhat.com> - 2.9.1-3
-- Resolves: rhbz#2236414 - dbus and crond getting terminated with SIGBUS in sss_client code
-- Resolves: rhbz#2237302 - SSSD runs multiples lookup search for each NFS request (SBUS req chaining stopped working in sssd-2.7)
+* Mon Sep 11 2023 Alexey Tikhonov <atikhono@redhat.com> - 2.9.2-1
+- Resolves: RHEL-2630 - Rebase SSSD for RHEL 8.10
+- Resolves: rhbz#2226021 - dbus and crond getting terminated with SIGBUS in sss_client code
+- Resolves: rhbz#2237253 - SSSD runs multiples lookup search for each NFS request (SBUS req chaining stopped working in sssd-2.7)
 
 * Mon Jul 10 2023 Alexey Tikhonov <atikhono@redhat.com> - 2.9.1-2
 - Resolves: rhbz#2149241 - [sssd] SSSD enters failed state after heavy load in the system
