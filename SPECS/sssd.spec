@@ -19,7 +19,7 @@
 
 Name: sssd
 Version: 2.9.4
-Release: 2%{?dist}
+Release: 3%{?dist}
 Group: Applications/System
 Summary: System Security Services Daemon
 License: GPLv3+
@@ -31,6 +31,7 @@ Patch0001: 0001-sssd-adding-mail-as-case-insensitive.patch
 Patch0002: 0002-sdap-add-search_bases-option-to-groups_by_user_send.patch
 Patch0003: 0003-sdap-add-naming_context-as-new-member-of-struct-sdap.patch
 Patch0004: 0004-pam-fix-SC-auth-with-multiple-certs-and-missing-logi.patch
+Patch0005: 0005-ad-gpo-use-hash-to-store-intermediate-results.patch
 
 ### Downstream Patches ###
 
@@ -1215,6 +1216,9 @@ fi
 %systemd_postun_with_restart sssd.service
 
 %changelog
+* Thu Apr 18 2024 Alexey Tikhonov <atikhono@redhat.com> - 2.9.4-3
+- Resolves: RHEL-27205 - Race condition during authorization leads to GPO policies functioning inconsistently
+
 * Mon Feb 12 2024 Alexey Tikhonov <atikhono@redhat.com> - 2.9.4-2
 - Resolves: RHEL-25064 - AD users are unable to log in due to case sensitivity of user because the domain is found as an alias to the email address. [rhel-8]
 - Resolves: RHEL-25066 - gdm smartcard login fails with sssd-2.9.3 in case of multiple identities [rhel-8]
