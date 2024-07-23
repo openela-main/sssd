@@ -27,7 +27,7 @@
 
 Name: sssd
 Version: 2.9.4
-Release: 6%{?dist}
+Release: 6%{?dist}.1
 Summary: System Security Services Daemon
 License: GPLv3+
 URL: https://github.com/SSSD/sssd/
@@ -49,6 +49,7 @@ Patch0012: 0012-pam_sss-prefer-Smartcard-authentication.patch
 Patch0013: 0013-pam-fix-storing-auth-types-for-offline-auth.patch
 Patch0014: 0014-ad-gpo-use-hash-to-store-intermediate-results.patch
 Patch0015: 0015-tests-Drop-extensions-from-openssl-command-if-there-.patch
+Patch0016: 0016-ad-refresh-root-domain-when-read-directly.patch
 
 ### Dependencies ###
 
@@ -1098,6 +1099,9 @@ fi
 %systemd_postun_with_restart sssd.service
 
 %changelog
+* Wed May 15 2024 Diaa Sami <disami@redhat.com> - 2.9.4-6.1
+- Resolves: RHEL-33896 - SSSD fails to process AD groups with 'Global Scope' correctly causing incomplete group-membership on RHEL if cache is empty [rhel-9.4.0]
+
 * Thu Apr 18 2024 Alexey Tikhonov <atikhono@redhat.com> - 2.9.4-6
 - Resolves: RHEL-27209 - Race condition during authorization leads to GPO policies functioning inconsistently [rhel-9.4.0]
 
