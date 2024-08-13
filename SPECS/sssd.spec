@@ -19,7 +19,7 @@
 
 Name: sssd
 Version: 2.9.4
-Release: 3%{?dist}
+Release: 4%{?dist}
 Group: Applications/System
 Summary: System Security Services Daemon
 License: GPLv3+
@@ -32,6 +32,7 @@ Patch0002: 0002-sdap-add-search_bases-option-to-groups_by_user_send.patch
 Patch0003: 0003-sdap-add-naming_context-as-new-member-of-struct-sdap.patch
 Patch0004: 0004-pam-fix-SC-auth-with-multiple-certs-and-missing-logi.patch
 Patch0005: 0005-ad-gpo-use-hash-to-store-intermediate-results.patch
+Patch0006: 0006-ad-refresh-root-domain-when-read-directly.patch
 
 ### Downstream Patches ###
 
@@ -1216,6 +1217,9 @@ fi
 %systemd_postun_with_restart sssd.service
 
 %changelog
+* Fri May 17 2024 Arun Bansal <arbansal@redhat.com> - 2.9.4-4
+- Resolves: RHEL-33957 - ad: refresh root domain when read directly 
+
 * Thu Apr 18 2024 Alexey Tikhonov <atikhono@redhat.com> - 2.9.4-3
 - Resolves: RHEL-27205 - Race condition during authorization leads to GPO policies functioning inconsistently
 
