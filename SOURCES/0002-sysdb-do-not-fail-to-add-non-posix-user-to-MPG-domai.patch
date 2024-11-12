@@ -1,0 +1,58 @@
+From d234cf5d6e793daf2c96856887acb641c4dff407 Mon Sep 17 00:00:00 2001
+From: Sumit Bose <sbose@redhat.com>
+Date: Fri, 14 Jun 2024 16:10:34 +0200
+Subject: [PATCH] sysdb: do not fail to add non-posix user to MPG domain
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+SSSD does not handle the root user (UID==0) and treats all accounts with
+UID 0 as non-Posix accounts. The primary GID of those accounts is 0 as
+well and as a result for those accounts in MPG domains the check for a
+collisions of the primary GID should be skipped. The current code might
+e.g. cause issues during GPO evaluation when adding a host account into
+the cache which does not have any UID or GID set in AD and SSSD is
+configured to read UID and GID from AD.
+
+Resolves: https://github.com/SSSD/sssd/issues/7451
+
+Reviewed-by: Alejandro López <allopez@redhat.com>
+Reviewed-by: Tomáš Halman <thalman@redhat.com>
+(cherry picked from commit 986bb726202e69b05f861c14c3a220379baf9bd1)
+---
+ src/db/sysdb_ops.c | 18 ++++++++++--------
+ 1 file changed, 10 insertions(+), 8 deletions(-)
+
+diff --git a/src/db/sysdb_ops.c b/src/db/sysdb_ops.c
+index 0f62e3b1a..76f4580aa 100644
+--- a/src/db/sysdb_ops.c
++++ b/src/db/sysdb_ops.c
+@@ -1914,15 +1914,17 @@ int sysdb_add_user(struct sss_domain_info *domain,
+             goto done;
+         }
+ 
+-        ret = sysdb_search_group_by_gid(tmp_ctx, domain, uid, NULL, &msg);
+-        if (ret != ENOENT) {
+-            if (ret == EOK) {
+-                DEBUG(SSSDBG_OP_FAILURE,
+-                    "Group with GID [%"SPRIgid"] already exists in an "
+-                    "MPG domain\n", gid);
+-                ret = EEXIST;
++        if (uid != 0) { /* uid == 0 means non-POSIX object */
++            ret = sysdb_search_group_by_gid(tmp_ctx, domain, uid, NULL, &msg);
++            if (ret != ENOENT) {
++                if (ret == EOK) {
++                    DEBUG(SSSDBG_OP_FAILURE,
++                        "Group with GID [%"SPRIgid"] already exists in an "
++                        "MPG domain\n", uid);
++                    ret = EEXIST;
++                }
++                goto done;
+             }
+-            goto done;
+         }
+     }
+ 
+-- 
+2.44.0
+

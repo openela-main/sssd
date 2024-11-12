@@ -26,30 +26,22 @@
 %global samba_package_version %(rpm -q samba-devel --queryformat %{version}-%{release})
 
 Name: sssd
-Version: 2.9.4
-Release: 6%{?dist}.1
+Version: 2.9.5
+Release: 4%{?dist}
 Summary: System Security Services Daemon
 License: GPLv3+
 URL: https://github.com/SSSD/sssd/
 Source0: https://github.com/SSSD/sssd/releases/download/%{version}/sssd-%{version}.tar.gz
 
 ### Patches ###
-Patch0001: 0001-sssd-adding-mail-as-case-insensitive.patch
-Patch0002: 0002-sdap-add-search_bases-option-to-groups_by_user_send.patch
-Patch0003: 0003-sdap-add-naming_context-as-new-member-of-struct-sdap.patch
-Patch0004: 0004-pam-fix-SC-auth-with-multiple-certs-and-missing-logi.patch
-Patch0005: 0005-sss-client-handle-key-value-in-destructor.patch
-Patch0006: 0006-krb5-Allow-fallback-between-responder-questions.patch
-Patch0007: 0007-krb5-Add-fallback-password-change-support.patch
-Patch0008: 0008-pam-fix-invalid-if-condition.patch
-Patch0009: 0009-krb5-add-OTP-to-krb5-response-selection.patch
-Patch0010: 0010-krb5-make-sure-answer_pkinit-use-matching-debug-mess.patch
-Patch0011: 0011-krb5-make-prompter-and-pre-auth-debug-message-less-i.patch
-Patch0012: 0012-pam_sss-prefer-Smartcard-authentication.patch
-Patch0013: 0013-pam-fix-storing-auth-types-for-offline-auth.patch
-Patch0014: 0014-ad-gpo-use-hash-to-store-intermediate-results.patch
-Patch0015: 0015-tests-Drop-extensions-from-openssl-command-if-there-.patch
-Patch0016: 0016-ad-refresh-root-domain-when-read-directly.patch
+Patch0001: 0001-spec-change-passkey_child-owner.patch
+Patch0002: 0002-sysdb-do-not-fail-to-add-non-posix-user-to-MPG-domai.patch
+Patch0003: 0003-ad-use-right-memory-context-in-GPO-code.patch
+Patch0004: 0004-TS_CACHE-never-try-to-upgrade-timestamps-cache.patch
+Patch0005: 0005-SYSDB-remove-index-on-dataExpireTimestamp.patch
+Patch0006: 0006-pam_sss-fix-passthrow-of-old-authtok-from-another-pa.patch
+Patch0007: 0007-krb5_child-do-not-try-passwords-with-OTP.patch
+Patch0008: 0008-pam_sss-add-missing-optional-2nd-factor-handling.patch
 
 ### Dependencies ###
 
@@ -1005,7 +997,7 @@ done
 %config(noreplace) %{_sysconfdir}/krb5.conf.d/sssd_enable_idp
 
 %files passkey
-%attr(755,%{sssd_user},%{sssd_user}) %{_libexecdir}/%{servicename}/passkey_child
+%{_libexecdir}/%{servicename}/passkey_child
 %{_libdir}/%{name}/modules/sssd_krb5_passkey_plugin.so
 %{_datadir}/sssd/krb5-snippets/sssd_enable_passkey
 %config(noreplace) %{_sysconfdir}/krb5.conf.d/sssd_enable_passkey
@@ -1099,8 +1091,32 @@ fi
 %systemd_postun_with_restart sssd.service
 
 %changelog
-* Wed May 15 2024 Diaa Sami <disami@redhat.com> - 2.9.4-6.1
-- Resolves: RHEL-33896 - SSSD fails to process AD groups with 'Global Scope' correctly causing incomplete group-membership on RHEL if cache is empty [rhel-9.4.0]
+* Thu Jul 18 2024 Alexey Tikhonov <atikhono@redhat.com> - 2.9.5-4
+- Resolves: RHEL-49711 - SYSDB: remove index on dataExpireTimestamp
+- Resolves: RHEL-49811 - 2FA is being enforced after upgrading 2.9.1->2.9.4
+
+* Mon Jul  8 2024 Alexey Tikhonov <atikhono@redhat.com> - 2.9.5-3
+- Resolves: RHEL-40742 - passkey_child with wrong owner
+
+* Mon Jun 24 2024 Alexey Tikhonov <atikhono@redhat.com> - 2.9.5-2
+- Resolves: RHEL-40742 - passkey_child with wrong owner
+- Resolves: RHEL-41047 - sssd is skipping GPO evaluation with auto_private_groups
+- Resolves: RHEL-40570 - GPO access the wrong memory location
+
+* Thu May 16 2024 Alexey Tikhonov <atikhono@redhat.com> - 2.9.5-1
+- Resolves: RHEL-36586 - Rebase SSSD for RHEL 9.5
+- Resolves: RHEL-27716 - SSSD fails to process AD groups with 'Global Scope' correctly causing incomplete group-membership on RHEL if cache is empty
+- Resolves: RHEL-17659 - [RfE] SSSD Failover Enhancements
+- Resolves: RHEL-35781 - Passkey errors when handling multiple altSecurityIdentities values
+- Resolves: RHEL-30142 - sssd_pac is crashing
+- Resolves: RHEL-22206 - Errors in krb5_child.log every time a user authenticates - Pre-authentication failed: No pkinit_anchors supplied
+- Resolves: RHEL-32595 - Excessive "Domain not found' messages logged to sssd_nss & sssd_be in multidomain AD forest
+- Resolves: RHEL-28666 - sssctl config-check is reporting false positive error msg
+- Resolves: RHEL-29454 - NULL dereference in inotify handling
+- Resolves: RHEL-1654 - Improve documentation for allowing e-mail address as username
+
+* Mon Apr 29 2024 Alexey Tikhonov <atikhono@redhat.com> - 2.9.4-7
+- Relates: RHEL-33645 - Rebase Samba to the latest 4.20.x release
 
 * Thu Apr 18 2024 Alexey Tikhonov <atikhono@redhat.com> - 2.9.4-6
 - Resolves: RHEL-27209 - Race condition during authorization leads to GPO policies functioning inconsistently [rhel-9.4.0]
