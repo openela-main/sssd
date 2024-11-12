@@ -27,7 +27,7 @@
 
 Name: sssd
 Version: 2.9.5
-Release: 4%{?dist}
+Release: 4%{?dist}.1
 Summary: System Security Services Daemon
 License: GPLv3+
 URL: https://github.com/SSSD/sssd/
@@ -42,6 +42,9 @@ Patch0005: 0005-SYSDB-remove-index-on-dataExpireTimestamp.patch
 Patch0006: 0006-pam_sss-fix-passthrow-of-old-authtok-from-another-pa.patch
 Patch0007: 0007-krb5_child-do-not-try-passwords-with-OTP.patch
 Patch0008: 0008-pam_sss-add-missing-optional-2nd-factor-handling.patch
+Patch0009: 0009-pam-only-set-SYSDB_LOCAL_SMARTCARD_AUTH-to-true-but-.patch
+Patch0010: 0010-sdap-allow-to-provide-user_map-when-looking-up-group.patch
+Patch0011: 0011-ad-use-default-user_map-when-looking-of-host-groups-.patch
 
 ### Dependencies ###
 
@@ -1091,6 +1094,10 @@ fi
 %systemd_postun_with_restart sssd.service
 
 %changelog
+* Tue Sep 24 2024 Alexey Tikhonov <atikhono@redhat.com> - 2.9.5-4.1
+- Resolves: RHEL-59876 - EL9/CentOS Stream 9 lost offline smart card authentication
+- Resolves: RHEL-50912 - possible regression of rhbz#2196521
+
 * Thu Jul 18 2024 Alexey Tikhonov <atikhono@redhat.com> - 2.9.5-4
 - Resolves: RHEL-49711 - SYSDB: remove index on dataExpireTimestamp
 - Resolves: RHEL-49811 - 2FA is being enforced after upgrading 2.9.1->2.9.4
