@@ -19,7 +19,7 @@
 
 Name: sssd
 Version: 2.9.4
-Release: 4%{?dist}
+Release: 5%{?dist}.1
 Group: Applications/System
 Summary: System Security Services Daemon
 License: GPLv3+
@@ -33,6 +33,15 @@ Patch0003: 0003-sdap-add-naming_context-as-new-member-of-struct-sdap.patch
 Patch0004: 0004-pam-fix-SC-auth-with-multiple-certs-and-missing-logi.patch
 Patch0005: 0005-ad-gpo-use-hash-to-store-intermediate-results.patch
 Patch0006: 0006-ad-refresh-root-domain-when-read-directly.patch
+Patch0007: 0007-failover-add-failover_primary_timeout-option.patch
+Patch0008: 0008-OPTS-Add-the-option-for-DP_OPT_DYNDNS_REFRESH_OFFSET.patch
+Patch0009: 0009-TESTS-Also-test-default_dyndns_opts.patch
+Patch0010: 0010-sdap-allow-to-provide-user_map-when-looking-up-group.patch
+Patch0011: 0011-ad-use-default-user_map-when-looking-of-host-groups-.patch
+Patch0012: 0012-sysdb-do-not-fail-to-add-non-posix-user-to-MPG-domai.patch
+Patch0013: 0013-ldap-add-exop_force-value-for-ldap_pwmodify_mode.patch
+Patch0014: 0014-DEBUG-reduce-log-level-in-case-a-responder-asks-for-.patch
+Patch0015: 0015-ldap_child-make-sure-invalid-krb5-context-is-not-use.patch
 
 ### Downstream Patches ###
 
@@ -1217,6 +1226,17 @@ fi
 %systemd_postun_with_restart sssd.service
 
 %changelog
+* Fri Nov 22 2024 Alexey Tikhonov <atikhono@redhat.com> - 2.9.4-5.1
+- Resolves: RHEL-67671 - Label DP_OPT_DYNDNS_REFRESH_OFFSET has no corresponding option [rhel-8.10.z]
+- Resolves: RHEL-68507 - sssd backend process segfaults when krb5.conf is invalid [rhel-8.10.z]
+- Resolves: RHEL-66267 - SSSD needs an option to indicate if the LDAP server can run the exop with an anonymous bind or not [rhel-8.10.z]
+- Resolves: RHEL-67128 - Excessive "Domain not found' messages logged to sssd_nss & sssd_be in multidomain AD forest [rhel-8.10.z]
+- Resolves: RHEL-66272 - sssd is skipping GPO evaluation with auto_private_groups [rhel-8.10.z]
+- Resolves: RHEL-66277 - possible regression of rhbz#2196521 [rhel-8.10.z]
+
+* Mon Sep 09 2024 Anuar Beisembayev <abeisemb@redhat.com> - 2.9.4-5
+- Resolves: RHEL-39085 - [RfE] SSSD Failover Enhancements
+
 * Fri May 17 2024 Arun Bansal <arbansal@redhat.com> - 2.9.4-4
 - Resolves: RHEL-33957 - ad: refresh root domain when read directly 
 

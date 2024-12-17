@@ -1,0 +1,55 @@
+From 3e7e0cc7038c89132c9f4b8a48b6b1e0c0febff4 Mon Sep 17 00:00:00 2001
+From: Sumit Bose <sbose@redhat.com>
+Date: Thu, 21 Nov 2024 09:16:09 +0100
+Subject: [PATCH 15/15] ldap_child: make sure invalid krb5 context is not used
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Resolves: https://github.com/SSSD/sssd/issues/7715
+
+Reviewed-by: Alejandro López <allopez@redhat.com>
+Reviewed-by: Alexey Tikhonov <atikhono@redhat.com>
+(cherry picked from commit fce94aec3f335cbe33c509b14e389b9df0748744)
+---
+ src/util/sss_krb5.c | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/src/util/sss_krb5.c b/src/util/sss_krb5.c
+index 3f57e5b26..f44df2b5f 100644
+--- a/src/util/sss_krb5.c
++++ b/src/util/sss_krb5.c
+@@ -83,6 +83,10 @@ const char *sss_printable_keytab_name(krb5_context ctx, const char *keytab_name)
+         return keytab_name;
+     }
+ 
++    if (ctx == NULL) {
++        return "-unknown-";
++    }
++
+     if (krb5_kt_default_name(ctx, buff, sizeof(buff)) != 0) {
+         return "-default keytab-";
+     }
+@@ -1355,8 +1359,9 @@ krb5_error_code sss_krb5_init_context(krb5_context *context)
+ {
+     krb5_error_code kerr;
+     const char *msg;
++    krb5_context ctx;
+ 
+-    kerr = krb5_init_context(context);
++    kerr = krb5_init_context(&ctx);
+     if (kerr != 0) {
+         /* It is safe to call (sss_)krb5_get_error_message() with NULL as first
+          * argument. */
+@@ -1365,6 +1370,8 @@ krb5_error_code sss_krb5_init_context(krb5_context *context)
+               "Failed to init Kerberos context [%s]\n", msg);
+         sss_log(SSS_LOG_CRIT, "Failed to init Kerberos context [%s]\n", msg);
+         sss_krb5_free_error_message(NULL, msg);
++    } else {
++        *context = ctx;
+     }
+ 
+     return kerr;
+-- 
+2.46.1
+

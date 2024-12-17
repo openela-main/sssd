@@ -1,0 +1,54 @@
+From aa81ab093966c1717ebfafbeef9f9f78944b9c23 Mon Sep 17 00:00:00 2001
+From: Alexey Tikhonov <atikhono@redhat.com>
+Date: Mon, 15 Apr 2024 16:29:33 +0200
+Subject: [PATCH 14/15] DEBUG: reduce log level in case a responder asks for
+ unknown domain
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Addition to 718fed9c53807b8502d6547bc0253b979d35e677
+
+Reviewed-by: Alejandro López <allopez@redhat.com>
+Reviewed-by: Iker Pedrosa <ipedrosa@redhat.com>
+(cherry picked from commit ab2671c00866d917f3e737a007ae64753f8440aa)
+(cherry picked from commit 8dcf23f215fe2a7fadf13598ce7f04523caa5eb0)
+
+Reviewed-by: Justin Stephenson <jstephen@redhat.com>
+---
+ src/responder/common/cache_req/plugins/cache_req_common.c | 5 ++++-
+ src/sbus/router/sbus_router_handler.c                     | 2 ++
+ 2 files changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/src/responder/common/cache_req/plugins/cache_req_common.c b/src/responder/common/cache_req/plugins/cache_req_common.c
+index 7eb09215a..00b9383ee 100644
+--- a/src/responder/common/cache_req/plugins/cache_req_common.c
++++ b/src/responder/common/cache_req/plugins/cache_req_common.c
+@@ -129,7 +129,10 @@ cache_req_common_process_dp_reply(struct cache_req *cr,
+     bool bret;
+ 
+     if (ret != EOK) {
+-        CACHE_REQ_DEBUG(SSSDBG_IMPORTANT_INFO, cr,
++        int msg_level = SSSDBG_IMPORTANT_INFO;
++        /* ERR_DOMAIN_NOT_FOUND: 'ad_enabled_domains' option can exclude domain */
++        if (ret == ERR_DOMAIN_NOT_FOUND) msg_level = SSSDBG_CONF_SETTINGS;
++        CACHE_REQ_DEBUG(msg_level, cr,
+                         "Could not get account info [%d]: %s\n",
+                         ret, sss_strerror(ret));
+         CACHE_REQ_DEBUG(SSSDBG_TRACE_FUNC, cr,
+diff --git a/src/sbus/router/sbus_router_handler.c b/src/sbus/router/sbus_router_handler.c
+index 7b6c2441f..732716046 100644
+--- a/src/sbus/router/sbus_router_handler.c
++++ b/src/sbus/router/sbus_router_handler.c
+@@ -150,6 +150,8 @@ static void sbus_issue_request_done(struct tevent_req *subreq)
+     } else {
+         int msg_level = SSSDBG_OP_FAILURE;
+         if (ret == ERR_MISSING_DP_TARGET) msg_level = SSSDBG_FUNC_DATA;
++        /* ERR_DOMAIN_NOT_FOUND: 'ad_enabled_domains' option can exclude domain */
++        if (ret == ERR_DOMAIN_NOT_FOUND) msg_level = SSSDBG_CONF_SETTINGS;
+         DEBUG(msg_level, "%s.%s: Error [%d]: %s\n",
+               meta.interface, meta.member, ret, sss_strerror(ret));
+     }
+-- 
+2.46.1
+

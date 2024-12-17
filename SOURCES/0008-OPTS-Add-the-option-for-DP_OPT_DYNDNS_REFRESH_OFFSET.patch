@@ -1,0 +1,35 @@
+From 5fc4540e97625a23f2573b0804a1509cf46931c9 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Alejandro=20L=C3=B3pez?= <allopez@redhat.com>
+Date: Thu, 14 Nov 2024 17:27:49 +0100
+Subject: [PATCH 08/15] OPTS: Add the option for DP_OPT_DYNDNS_REFRESH_OFFSET
+
+The label `DP_OPT_DYNDNS_REFRESH_OFFSET` was introduced in
+https://github.com/SSSD/sssd/blob/fb91349cfeba653942b32141f890e3de78b3fb13/src/providers/be_dyndns.h#L55
+but the corresponding option is missing in
+https://github.com/SSSD/sssd/blob/fb91349cfeba653942b32141f890e3de78b3fb13/src/providers/be_dyndns.c#L1200
+
+This error was introduced by
+https://github.com/SSSD/sssd/commit/35c35de42012481a6bd2690d12d5d11a4ae23ea5
+
+Reviewed-by: Alexey Tikhonov <atikhono@redhat.com>
+Reviewed-by: Sumit Bose <sbose@redhat.com>
+(cherry picked from commit 9ee10f98e0070774e0e7f0794bc296ef06a671e4)
+---
+ src/providers/be_dyndns.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/src/providers/be_dyndns.c b/src/providers/be_dyndns.c
+index 2c655ef1e..5d0f51119 100644
+--- a/src/providers/be_dyndns.c
++++ b/src/providers/be_dyndns.c
+@@ -1201,6 +1201,7 @@ static struct dp_option default_dyndns_opts[] = {
+     { "dyndns_update", DP_OPT_BOOL, BOOL_FALSE, BOOL_FALSE },
+     { "dyndns_update_per_family", DP_OPT_BOOL, BOOL_TRUE, BOOL_TRUE },
+     { "dyndns_refresh_interval", DP_OPT_NUMBER, NULL_NUMBER, NULL_NUMBER },
++    { "dyndns_refresh_interval_offset", DP_OPT_NUMBER, NULL_NUMBER, NULL_NUMBER },
+     { "dyndns_iface", DP_OPT_STRING, NULL_STRING, NULL_STRING },
+     { "dyndns_ttl", DP_OPT_NUMBER, { .number = 1200 }, NULL_NUMBER },
+     { "dyndns_update_ptr", DP_OPT_BOOL, BOOL_TRUE, BOOL_FALSE },
+-- 
+2.46.1
+

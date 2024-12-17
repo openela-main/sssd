@@ -1,0 +1,306 @@
+From 14f32f681a25aac185d72bc6d22a9e3b59dd265a Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Pavel=20B=C5=99ezina?= <pbrezina@redhat.com>
+Date: Tue, 30 Apr 2024 12:28:53 +0200
+Subject: [PATCH] failover: add failover_primary_timeout option
+
+This was previously hardcoded to 31 seconds (hardcoded retry_timout +
+1). This may be too short period under some circumstances.
+
+When we retry primary server we drop connection to the backup server and
+if the primary server is not yet available (and there are many
+unavailable primary servers) we may go through a long timeout cycle
+every half minute.
+
+This patch makes the value configurable.
+
+:config: Added `failover_primary_timout` configuration option. This
+  can be used to configure how often SSSD tries to reconnect to a
+  primary server after a successful connection to a backup server.
+  This was previously hardcoded to 31 seconds which is kept as
+  the default value.
+
+Resolves: https://github.com/SSSD/sssd/issues/7375
+
+Reviewed-by: Alexey Tikhonov <atikhono@redhat.com>
+Reviewed-by: Iker Pedrosa <ipedrosa@redhat.com>
+(cherry picked from commit e9738e36937e78f80bb2772c48cffbddf39bd5fe)
+---
+ src/config/SSSDConfig/sssdoptions.py    |  2 +
+ src/config/SSSDConfigTest.py            |  2 +
+ src/config/cfg_rules.ini                |  1 +
+ src/config/etc/sssd.api.conf            |  1 +
+ src/man/sssd.conf.5.xml                 | 19 ++++++++
+ src/providers/data_provider.h           |  1 +
+ src/providers/data_provider_fo.c        | 14 +++++-
+ src/providers/fail_over.c               | 10 +++++
+ src/providers/fail_over.h               |  3 ++
+ src/tests/system/tests/test_failover.py | 59 +++++++++++++++++++++++++
+ 10 files changed, 110 insertions(+), 2 deletions(-)
+ create mode 100644 src/tests/system/tests/test_failover.py
+
+diff --git a/src/config/SSSDConfig/sssdoptions.py b/src/config/SSSDConfig/sssdoptions.py
+index 0d75e6d82..95b39aa59 100644
+--- a/src/config/SSSDConfig/sssdoptions.py
++++ b/src/config/SSSDConfig/sssdoptions.py
+@@ -186,6 +186,8 @@ class SSSDOptions(object):
+         'dns_resolver_op_timeout': _('How long should keep trying to resolve single DNS query (seconds)'),
+         'dns_resolver_timeout': _('How long to wait for replies from DNS when resolving servers (seconds)'),
+         'dns_discovery_domain': _('The domain part of service discovery DNS query'),
++        'failover_primary_timeout': _('How often SSSD tries to reconnect to the primary server after a successful '
++                                      'connection to the backup server.'),
+         'override_gid': _('Override GID value from the identity provider with this value'),
+         'case_sensitive': _('Treat usernames as case sensitive'),
+         'entry_cache_user_timeout': _('Entry cache timeout length (seconds)'),
+diff --git a/src/config/SSSDConfigTest.py b/src/config/SSSDConfigTest.py
+index b160be2b1..f333c35eb 100755
+--- a/src/config/SSSDConfigTest.py
++++ b/src/config/SSSDConfigTest.py
+@@ -579,6 +579,7 @@ class SSSDConfigTestSSSDDomain(unittest.TestCase):
+             'dns_resolver_op_timeout',
+             'dns_resolver_timeout',
+             'dns_discovery_domain',
++            'failover_primary_timeout',
+             'dyndns_update',
+             'dyndns_ttl',
+             'dyndns_iface',
+@@ -939,6 +940,7 @@ class SSSDConfigTestSSSDDomain(unittest.TestCase):
+             'dns_resolver_op_timeout',
+             'dns_resolver_timeout',
+             'dns_discovery_domain',
++            'failover_primary_timeout',
+             'dyndns_update',
+             'dyndns_ttl',
+             'dyndns_iface',
+diff --git a/src/config/cfg_rules.ini b/src/config/cfg_rules.ini
+index 92e87fb18..4c2ea0b87 100644
+--- a/src/config/cfg_rules.ini
++++ b/src/config/cfg_rules.ini
+@@ -405,6 +405,7 @@ option = dns_resolver_op_timeout
+ option = dns_resolver_timeout
+ option = dns_resolver_use_search_list
+ option = dns_discovery_domain
++option = failover_primary_timeout
+ option = override_gid
+ option = case_sensitive
+ option = override_homedir
+diff --git a/src/config/etc/sssd.api.conf b/src/config/etc/sssd.api.conf
+index 5ae6aab19..31787c23c 100644
+--- a/src/config/etc/sssd.api.conf
++++ b/src/config/etc/sssd.api.conf
+@@ -172,6 +172,7 @@ dns_resolver_server_timeout = int, None, false
+ dns_resolver_op_timeout = int, None, false
+ dns_resolver_timeout = int, None, false
+ dns_discovery_domain = str, None, false
++failover_primary_timeout = int, None, false
+ override_gid = int, None, false
+ case_sensitive = str, None, false
+ override_homedir = str, None, false
+diff --git a/src/man/sssd.conf.5.xml b/src/man/sssd.conf.5.xml
+index 339f21e25..fbb82e357 100644
+--- a/src/man/sssd.conf.5.xml
++++ b/src/man/sssd.conf.5.xml
+@@ -3773,6 +3773,25 @@ pam_gssapi_indicators_map = sudo:pkinit, sudo-i:pkinit
+                     </listitem>
+                 </varlistentry>
+ 
++                <varlistentry>
++                    <term>failover_primary_timeout (integer)</term>
++                    <listitem>
++                        <para>
++                            When no primary server is currently available,
++                            SSSD fail overs to a backup server. This option
++                            defines the amount of time (in seconds) to
++                            wait before SSSD tries to reconnect to a primary
++                            server again.
++                        </para>
++                        <para>
++                            Note: The minimum value is 31.
++                        </para>
++                        <para>
++                            Default: 31
++                        </para>
++                    </listitem>
++                </varlistentry>
++
+                 <varlistentry>
+                     <term>override_gid (integer)</term>
+                     <listitem>
+diff --git a/src/providers/data_provider.h b/src/providers/data_provider.h
+index 36a82b84d..def35e491 100644
+--- a/src/providers/data_provider.h
++++ b/src/providers/data_provider.h
+@@ -267,6 +267,7 @@ enum dp_res_opts {
+     DP_RES_OPT_RESOLVER_SERVER_TIMEOUT,
+     DP_RES_OPT_RESOLVER_USE_SEARCH_LIST,
+     DP_RES_OPT_DNS_DOMAIN,
++    DP_RES_OPT_FAILOVER_PRIMARY_TIMEOUT,
+ 
+     DP_RES_OPTS /* attrs counter */
+ };
+diff --git a/src/providers/data_provider_fo.c b/src/providers/data_provider_fo.c
+index b0aed54e9..c23f92e35 100644
+--- a/src/providers/data_provider_fo.c
++++ b/src/providers/data_provider_fo.c
+@@ -48,10 +48,20 @@ static int be_fo_get_options(struct be_ctx *ctx,
+                                                   DP_RES_OPT_RESOLVER_TIMEOUT);
+     opts->use_search_list = dp_opt_get_bool(ctx->be_res->opts,
+                                             DP_RES_OPT_RESOLVER_USE_SEARCH_LIST);
++    opts->primary_timeout = dp_opt_get_int(ctx->be_res->opts,
++                                           DP_RES_OPT_FAILOVER_PRIMARY_TIMEOUT);
++
+     opts->retry_timeout = 30;
+     opts->srv_retry_neg_timeout = 15;
+     opts->family_order = ctx->be_res->family_order;
+ 
++    if (opts->primary_timeout <= opts->retry_timeout) {
++        opts->primary_timeout = opts->retry_timeout + 1;
++        DEBUG(SSSDBG_CONF_SETTINGS,
++              "Warning: failover_primary_timeout is too low, using %lu "
++              "seconds instead\n", opts->primary_timeout);
++    }
++
+     return EOK;
+ }
+ 
+@@ -551,7 +561,7 @@ static void be_resolve_server_done(struct tevent_req *subreq)
+                                                       struct tevent_req);
+     struct be_resolve_server_state *state = tevent_req_data(req,
+                                              struct be_resolve_server_state);
+-    time_t timeout = fo_get_service_retry_timeout(state->svc->fo_service) + 1;
++    time_t timeout = fo_get_primary_retry_timeout(state->svc->fo_service);
+     int ret;
+ 
+     ret = be_resolve_server_process(subreq, state, &new_subreq);
+@@ -564,7 +574,6 @@ static void be_resolve_server_done(struct tevent_req *subreq)
+     }
+ 
+     if (!fo_is_server_primary(state->srv)) {
+-        /* FIXME: make the timeout configurable */
+         ret = be_primary_server_timeout_activate(state->ctx, state->ev,
+                                                  state->ctx, state->svc,
+                                                  timeout);
+@@ -871,6 +880,7 @@ static struct dp_option dp_res_default_opts[] = {
+     { "dns_resolver_server_timeout", DP_OPT_NUMBER, { .number = 1000 }, NULL_NUMBER },
+     { "dns_resolver_use_search_list", DP_OPT_BOOL, BOOL_TRUE, BOOL_TRUE },
+     { "dns_discovery_domain", DP_OPT_STRING, NULL_STRING, NULL_STRING },
++    { "failover_primary_timeout", DP_OPT_NUMBER, { .number = 31 }, NULL_NUMBER },
+     DP_OPTION_TERMINATOR
+ };
+ 
+diff --git a/src/providers/fail_over.c b/src/providers/fail_over.c
+index 7cb642448..7f94407c5 100644
+--- a/src/providers/fail_over.c
++++ b/src/providers/fail_over.c
+@@ -158,6 +158,7 @@ fo_context_init(TALLOC_CTX *mem_ctx, struct fo_options *opts)
+ 
+     ctx->opts->srv_retry_neg_timeout = opts->srv_retry_neg_timeout;
+     ctx->opts->retry_timeout = opts->retry_timeout;
++    ctx->opts->primary_timeout = opts->primary_timeout;
+     ctx->opts->family_order  = opts->family_order;
+     ctx->opts->service_resolv_timeout = opts->service_resolv_timeout;
+     ctx->opts->use_search_list = opts->use_search_list;
+@@ -1740,6 +1741,15 @@ time_t fo_get_service_retry_timeout(struct fo_service *svc)
+     return svc->ctx->opts->retry_timeout;
+ }
+ 
++time_t fo_get_primary_retry_timeout(struct fo_service *svc)
++{
++    if (svc == NULL || svc->ctx == NULL || svc->ctx->opts == NULL) {
++        return 0;
++    }
++
++    return svc->ctx->opts->primary_timeout;
++}
++
+ bool fo_get_use_search_list(struct fo_server *server)
+ {
+     if (
+diff --git a/src/providers/fail_over.h b/src/providers/fail_over.h
+index 36021ad6f..924a09970 100644
+--- a/src/providers/fail_over.h
++++ b/src/providers/fail_over.h
+@@ -83,6 +83,7 @@ struct fo_server;
+ struct fo_options {
+     time_t srv_retry_neg_timeout;
+     time_t retry_timeout;
++    time_t primary_timeout;
+     int service_resolv_timeout;
+     bool use_search_list;
+     enum restrict_family family_order;
+@@ -211,6 +212,8 @@ int fo_is_srv_lookup(struct fo_server *s);
+ 
+ time_t fo_get_service_retry_timeout(struct fo_service *svc);
+ 
++time_t fo_get_primary_retry_timeout(struct fo_service *svc);
++
+ bool fo_get_use_search_list(struct fo_server *server);
+ 
+ void fo_reset_services(struct fo_ctx *fo_ctx);
+diff --git a/src/tests/system/tests/test_failover.py b/src/tests/system/tests/test_failover.py
+new file mode 100644
+index 000000000..565cec9bc
+--- /dev/null
++++ b/src/tests/system/tests/test_failover.py
+@@ -0,0 +1,59 @@
++"""
++SSSD Failover tests.
++
++:requirement: Failover
++"""
++
++from __future__ import annotations
++
++import pytest
++from sssd_test_framework.roles.client import Client
++from sssd_test_framework.roles.ldap import LDAP
++from sssd_test_framework.topology import KnownTopology
++
++
++@pytest.mark.parametrize("value, expected", [(None, 31), (15, 31), (60, 60)])
++@pytest.mark.importance("low")
++@pytest.mark.ticket(gh=7375, jira="RHEL-17659")
++@pytest.mark.topology(KnownTopology.LDAP)
++def test_failover__retry_primary(client: Client, ldap: LDAP, value: int | None, expected: int):
++    """
++    :title: Primary server reactivation timeout is respected
++    :setup:
++        1. Create LDAP user "user-1"
++        2. Set failover_primary_timeout to @value
++        3. Set ldap_uri to invalid, not working server
++        4. Set ldap_backup_uri to working server
++        5. Start SSSD
++    :steps:
++        1. Lookup user-1
++        2. Check that SSSD is connected to backup server
++        3. Find "Primary server reactivation timeout set to @expected seconds" in domain logs
++    :expectedresults:
++        1. SSSD failover to backup server
++        2. SSSD is indeed connected to the backup server
++        3. String is found
++    :customerscenario: True
++    """
++    ldap.user("user-1").add()
++
++    if value is not None:
++        client.sssd.domain["failover_primary_timeout"] = str(value)
++
++    client.sssd.enable_responder("ifp")
++    client.sssd.domain["ldap_uri"] = "ldap://ldap.invalid"
++    client.sssd.domain["ldap_backup_uri"] = f"ldap://{ldap.host.hostname}"
++    client.sssd.start()
++
++    # Lookup user to make sure SSSD did correctly failover to backup server
++    result = client.tools.id("user-1")
++    assert result is not None
++
++    # Check that SSSD is indeed connected to backup server
++    assert client.sssd.default_domain is not None
++    status = client.sssctl.domain_status(client.sssd.default_domain, active=True)
++    assert ldap.host.hostname in status.stdout
++
++    # Check that primary server reactivation timeout was correctly created
++    log = client.fs.read(client.sssd.logs.domain())
++    assert f"Primary server reactivation timeout set to {expected} seconds" in log
+-- 
+2.46.0
+
