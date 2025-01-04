@@ -1,0 +1,69 @@
+From 5411fa745f939bdf4cb105bd9f6b9b77703532af Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Alejandro=20L=C3=B3pez?= <allopez@redhat.com>
+Date: Thu, 14 Nov 2024 18:46:44 +0100
+Subject: [PATCH 14/14] TESTS: Also test default_dyndns_opts
+
+Compare this structure to ipa_dyndns_opts, which is already compared
+to ad_dyndns_opts.
+
+Reviewed-by: Alexey Tikhonov <atikhono@redhat.com>
+Reviewed-by: Sumit Bose <sbose@redhat.com>
+(cherry picked from commit 2c72834e657197012b3a32207ffe307e8ba5f9e2)
+---
+ src/providers/be_dyndns.c      | 2 +-
+ src/providers/be_dyndns.h      | 1 +
+ src/tests/ipa_ldap_opt-tests.c | 6 ++++++
+ 3 files changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/src/providers/be_dyndns.c b/src/providers/be_dyndns.c
+index 5d0f51119..e6fa7dfd6 100644
+--- a/src/providers/be_dyndns.c
++++ b/src/providers/be_dyndns.c
+@@ -1197,7 +1197,7 @@ be_nsupdate_check(void)
+     return ret;
+ }
+ 
+-static struct dp_option default_dyndns_opts[] = {
++struct dp_option default_dyndns_opts[] = {
+     { "dyndns_update", DP_OPT_BOOL, BOOL_FALSE, BOOL_FALSE },
+     { "dyndns_update_per_family", DP_OPT_BOOL, BOOL_TRUE, BOOL_TRUE },
+     { "dyndns_refresh_interval", DP_OPT_NUMBER, NULL_NUMBER, NULL_NUMBER },
+diff --git a/src/providers/be_dyndns.h b/src/providers/be_dyndns.h
+index 2185fee95..719c13942 100644
+--- a/src/providers/be_dyndns.h
++++ b/src/providers/be_dyndns.h
+@@ -63,6 +63,7 @@ enum dp_dyndns_opts {
+ 
+     DP_OPT_DYNDNS /* attrs counter */
+ };
++extern struct dp_option default_dyndns_opts[DP_OPT_DYNDNS + 1];
+ 
+ #define DYNDNS_REMOVE_A     0x1
+ #define DYNDNS_REMOVE_AAAA  0x2
+diff --git a/src/tests/ipa_ldap_opt-tests.c b/src/tests/ipa_ldap_opt-tests.c
+index a1a0e9cc6..da990acaf 100644
+--- a/src/tests/ipa_ldap_opt-tests.c
++++ b/src/tests/ipa_ldap_opt-tests.c
+@@ -103,6 +103,10 @@ START_TEST(test_compare_opts)
+     ret = compare_dp_options(ipa_dyndns_opts, DP_OPT_DYNDNS,
+                              ad_dyndns_opts);
+     ck_assert_msg(ret == EOK, "[%s]", strerror(ret));
++
++    ret = compare_dp_options(ipa_dyndns_opts, DP_OPT_DYNDNS,
++                             default_dyndns_opts);
++    ck_assert_msg(ret == EOK, "[%s]", strerror(ret));
+ }
+ END_TEST
+ 
+@@ -200,6 +204,8 @@ START_TEST(test_dp_opt_sentinel)
+ 
+     fail_unless_dp_opt_is_terminator(&default_krb5_opts[KRB5_OPTS]);
+ 
++    fail_unless_dp_opt_is_terminator(&default_dyndns_opts[DP_OPT_DYNDNS]);
++
+     fail_unless_dp_opt_is_terminator(&ad_basic_opts[AD_OPTS_BASIC]);
+     fail_unless_dp_opt_is_terminator(&ad_def_ldap_opts[SDAP_OPTS_BASIC]);
+     fail_unless_dp_opt_is_terminator(&ad_def_krb5_opts[KRB5_OPTS]);
+-- 
+2.46.1
+

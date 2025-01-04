@@ -27,7 +27,7 @@
 
 Name: sssd
 Version: 2.9.5
-Release: 4%{?dist}.1
+Release: 4%{?dist}.4
 Summary: System Security Services Daemon
 License: GPLv3+
 URL: https://github.com/SSSD/sssd/
@@ -45,6 +45,10 @@ Patch0008: 0008-pam_sss-add-missing-optional-2nd-factor-handling.patch
 Patch0009: 0009-pam-only-set-SYSDB_LOCAL_SMARTCARD_AUTH-to-true-but-.patch
 Patch0010: 0010-sdap-allow-to-provide-user_map-when-looking-up-group.patch
 Patch0011: 0011-ad-use-default-user_map-when-looking-of-host-groups-.patch
+Patch0012: 0012-ldap-add-exop_force-value-for-ldap_pwmodify_mode.patch
+Patch0013: 0013-OPTS-Add-the-option-for-DP_OPT_DYNDNS_REFRESH_OFFSET.patch
+Patch0014: 0014-TESTS-Also-test-default_dyndns_opts.patch
+Patch0015: 0015-ldap_child-make-sure-invalid-krb5-context-is-not-use.patch
 
 ### Dependencies ###
 
@@ -1094,6 +1098,15 @@ fi
 %systemd_postun_with_restart sssd.service
 
 %changelog
+* Fri Nov 22 2024 Alexey Tikhonov <atikhono@redhat.com> - 2.9.5-4.4
+- Resolves: RHEL-68508 - sssd backend process segfaults when krb5.conf is invalid [rhel-9.5.z]
+
+* Mon Nov 18 2024 Alexey Tikhonov <atikhono@redhat.com> - 2.9.5-4.3
+- Resolves: RHEL-67673 - Label DP_OPT_DYNDNS_REFRESH_OFFSET has no corresponding option [rhel-9.5.z]
+
+* Fri Nov  8 2024 Alexey Tikhonov <atikhono@redhat.com> - 2.9.5-4.2
+- Resolves: RHEL-66268 - SSSD needs an option to indicate if the LDAP server can run the exop with an anonymous bind or not [rhel-9.5.z]
+
 * Tue Sep 24 2024 Alexey Tikhonov <atikhono@redhat.com> - 2.9.5-4.1
 - Resolves: RHEL-59876 - EL9/CentOS Stream 9 lost offline smart card authentication
 - Resolves: RHEL-50912 - possible regression of rhbz#2196521
