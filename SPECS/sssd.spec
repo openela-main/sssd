@@ -23,11 +23,11 @@
 %global ldb_modulesdir %(pkg-config --variable=modulesdir ldb)
 %global ldb_version 1.2.0
 
-%global samba_package_version %(rpm -q samba-devel --queryformat %{version}-%{release})
+%global samba_package_version %(rpm -q samba-devel --queryformat %{version})
 
 Name: sssd
 Version: 2.9.6
-Release: 4%{?dist}
+Release: 4%{?dist}.2
 Summary: System Security Services Daemon
 License: GPLv3+
 URL: https://github.com/SSSD/sssd/
@@ -37,6 +37,7 @@ Source0: https://github.com/SSSD/sssd/releases/download/%{version}/sssd-%{versio
 Patch0001: 0001-SYSDB-Use-SYSDB_NAME-from-cached-entry-when-updating.patch
 Patch0002: 0002-KCM-fix-memory-leak.patch
 Patch0003: 0003-KCM-another-memory-leak-fixed.patch
+Patch0004: 0004-SYSDB-don-t-add-group-members-if-ignore_group_member.patch
 
 ### Dependencies ###
 
@@ -1086,6 +1087,12 @@ fi
 %systemd_postun_with_restart sssd.service
 
 %changelog
+* Mon Apr  7 2025 Alexey Tikhonov <atikhono@redhat.com> - 2.9.6-4.2
+- Resolves: RHEL-82419 - Disk cache failure with large db sizes [rhel-9]
+
+* Wed Apr  2 2025 Alexey Tikhonov <atikhono@redhat.com> - 2.9.6-4.1
+- Resolves: RHEL-82419 - Disk cache failure with large db sizes [rhel-9]
+
 * Wed Feb 12 2025 Alexey Tikhonov <atikhono@redhat.com> - 2.9.6-4
 - Resolves: RHEL-78253 - 'sssd_kcm' leaks memory [rhel-9]
 
