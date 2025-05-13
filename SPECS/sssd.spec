@@ -26,29 +26,17 @@
 %global samba_package_version %(rpm -q samba-devel --queryformat %{version}-%{release})
 
 Name: sssd
-Version: 2.9.5
-Release: 4%{?dist}.4
+Version: 2.9.6
+Release: 4%{?dist}
 Summary: System Security Services Daemon
 License: GPLv3+
 URL: https://github.com/SSSD/sssd/
 Source0: https://github.com/SSSD/sssd/releases/download/%{version}/sssd-%{version}.tar.gz
 
 ### Patches ###
-Patch0001: 0001-spec-change-passkey_child-owner.patch
-Patch0002: 0002-sysdb-do-not-fail-to-add-non-posix-user-to-MPG-domai.patch
-Patch0003: 0003-ad-use-right-memory-context-in-GPO-code.patch
-Patch0004: 0004-TS_CACHE-never-try-to-upgrade-timestamps-cache.patch
-Patch0005: 0005-SYSDB-remove-index-on-dataExpireTimestamp.patch
-Patch0006: 0006-pam_sss-fix-passthrow-of-old-authtok-from-another-pa.patch
-Patch0007: 0007-krb5_child-do-not-try-passwords-with-OTP.patch
-Patch0008: 0008-pam_sss-add-missing-optional-2nd-factor-handling.patch
-Patch0009: 0009-pam-only-set-SYSDB_LOCAL_SMARTCARD_AUTH-to-true-but-.patch
-Patch0010: 0010-sdap-allow-to-provide-user_map-when-looking-up-group.patch
-Patch0011: 0011-ad-use-default-user_map-when-looking-of-host-groups-.patch
-Patch0012: 0012-ldap-add-exop_force-value-for-ldap_pwmodify_mode.patch
-Patch0013: 0013-OPTS-Add-the-option-for-DP_OPT_DYNDNS_REFRESH_OFFSET.patch
-Patch0014: 0014-TESTS-Also-test-default_dyndns_opts.patch
-Patch0015: 0015-ldap_child-make-sure-invalid-krb5-context-is-not-use.patch
+Patch0001: 0001-SYSDB-Use-SYSDB_NAME-from-cached-entry-when-updating.patch
+Patch0002: 0002-KCM-fix-memory-leak.patch
+Patch0003: 0003-KCM-another-memory-leak-fixed.patch
 
 ### Dependencies ###
 
@@ -1098,14 +1086,23 @@ fi
 %systemd_postun_with_restart sssd.service
 
 %changelog
-* Fri Nov 22 2024 Alexey Tikhonov <atikhono@redhat.com> - 2.9.5-4.4
-- Resolves: RHEL-68508 - sssd backend process segfaults when krb5.conf is invalid [rhel-9.5.z]
+* Wed Feb 12 2025 Alexey Tikhonov <atikhono@redhat.com> - 2.9.6-4
+- Resolves: RHEL-78253 - 'sssd_kcm' leaks memory [rhel-9]
 
-* Mon Nov 18 2024 Alexey Tikhonov <atikhono@redhat.com> - 2.9.5-4.3
-- Resolves: RHEL-67673 - Label DP_OPT_DYNDNS_REFRESH_OFFSET has no corresponding option [rhel-9.5.z]
+* Mon Feb 10 2025 Alexey Tikhonov <atikhono@redhat.com> - 2.9.6-3
+- Resolves: RHEL-78253 - 'sssd_kcm' leaks memory [rhel-9]
 
-* Fri Nov  8 2024 Alexey Tikhonov <atikhono@redhat.com> - 2.9.5-4.2
-- Resolves: RHEL-66268 - SSSD needs an option to indicate if the LDAP server can run the exop with an anonymous bind or not [rhel-9.5.z]
+* Tue Jan 14 2025 Alexey Tikhonov <atikhono@redhat.com> - 2.9.6-2
+- Resolves: RHEL-73400 - Use the DN from existing entry when updating a cached group [rhel-9]
+
+* Thu Dec  5 2024 Alexey Tikhonov <atikhono@redhat.com> - 2.9.6-1
+- Resolves: RHEL-70189 - Rebase SSSD for RHEL 9.6
+- Resolves: RHEL-67670 - Label DP_OPT_DYNDNS_REFRESH_OFFSET has no corresponding option [rhel-9]
+- Resolves: RHEL-68369 - sssd backend process segfaults when krb5.conf is invalid
+- Resolves: RHEL-66266 - SSSD needs an option to indicate if the LDAP server can run the exop with an anonymous bind or not [rhel-9]
+
+* Mon Oct 21 2024 Alexey Tikhonov <atikhono@redhat.com> - 2.9.5-5
+- Related: RHEL-59788 - Rebase Samba to the latest 4.21.x release
 
 * Tue Sep 24 2024 Alexey Tikhonov <atikhono@redhat.com> - 2.9.5-4.1
 - Resolves: RHEL-59876 - EL9/CentOS Stream 9 lost offline smart card authentication

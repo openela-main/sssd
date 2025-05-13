@@ -1,0 +1,93 @@
+From 6aba9a7dd2261c19f053d5fbd5358fdaf335b807 Mon Sep 17 00:00:00 2001
+From: Alexey Tikhonov <atikhono@redhat.com>
+Date: Wed, 5 Feb 2025 08:59:49 +0100
+Subject: [PATCH] KCM: fix memory leak
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+The copy of 'secret' argument - `secret_val.data` - was left hanging
+on `sss_sec_ctx`, effectively resulting in a memory leak.
+But this copy isn't actually required as this data isn't modified in
+below operations.
+
+This is a backport of https://github.com/SSSD/sssd/pull/7823
+
+:fixes:'sssd_kcm' memory leak was fixed.
+
+Reviewed-by: Alejandro López <allopez@redhat.com>
+Reviewed-by: Justin Stephenson <jstephen@redhat.com>
+---
+ src/responder/kcm/secrets/secrets.c | 28 ++++++++++++----------------
+ 1 file changed, 12 insertions(+), 16 deletions(-)
+
+diff --git a/src/responder/kcm/secrets/secrets.c b/src/responder/kcm/secrets/secrets.c
+index 730fa68b6..d1a9672d5 100644
+--- a/src/responder/kcm/secrets/secrets.c
++++ b/src/responder/kcm/secrets/secrets.c
+@@ -953,7 +953,7 @@ errno_t sss_sec_put(struct sss_sec_req *req,
+                     size_t secret_len)
+ {
+     struct ldb_message *msg;
+-    struct ldb_val secret_val;
++    const struct ldb_val secret_val = { .length = secret_len, .data = secret };
+     int ret;
+ 
+     if (req == NULL || secret == NULL) {
+@@ -1002,13 +1002,11 @@ errno_t sss_sec_put(struct sss_sec_req *req,
+         goto done;
+     }
+ 
+-    secret_val.length = secret_len;
+-    secret_val.data = talloc_memdup(req->sctx, secret, secret_len);
+-    if (!secret_val.data) {
+-        ret = ENOMEM;
+-        goto done;
+-    }
+-
++    /* `ldb_msg_add_value()` does NOT make a copy of secret_val::*data
++     * but rather copies a pointer under the hood.
++     * This is fine since no operations modifying this data are performed
++     * below and 'msg' is freed before function returns.
++     */
+     ret = ldb_msg_add_value(msg, SEC_ATTR_SECRET, &secret_val, NULL);
+     if (ret != EOK) {
+         DEBUG(SSSDBG_OP_FAILURE,
+@@ -1050,7 +1048,7 @@ errno_t sss_sec_update(struct sss_sec_req *req,
+                        size_t secret_len)
+ {
+     struct ldb_message *msg;
+-    struct ldb_val secret_val;
++    const struct ldb_val secret_val = { .length = secret_len, .data = secret };
+     int ret;
+ 
+     if (req == NULL || secret == NULL) {
+@@ -1099,13 +1097,6 @@ errno_t sss_sec_update(struct sss_sec_req *req,
+         goto done;
+     }
+ 
+-    secret_val.length = secret_len;
+-    secret_val.data = talloc_memdup(req->sctx, secret, secret_len);
+-    if (!secret_val.data) {
+-        ret = ENOMEM;
+-        goto done;
+-    }
+-
+     /* FIXME - should we have a lastUpdate timestamp? */
+     ret = ldb_msg_add_empty(msg, SEC_ATTR_SECRET, LDB_FLAG_MOD_REPLACE, NULL);
+     if (ret != LDB_SUCCESS) {
+@@ -1115,6 +1106,11 @@ errno_t sss_sec_update(struct sss_sec_req *req,
+         goto done;
+     }
+ 
++    /* `ldb_msg_add_value()` does NOT make a copy of secret_val::*data
++     * but rather copies a pointer under the hood.
++     * This is fine since no operations modifying this data are performed
++     * below and 'msg' is freed before function returns.
++     */
+     ret = ldb_msg_add_value(msg, SEC_ATTR_SECRET, &secret_val, NULL);
+     if (ret != LDB_SUCCESS) {
+         DEBUG(SSSDBG_MINOR_FAILURE,
+-- 
+2.47.0
+

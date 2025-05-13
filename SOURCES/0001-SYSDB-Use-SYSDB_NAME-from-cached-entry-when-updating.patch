@@ -1,0 +1,83 @@
+From 4f9fb5fd301d635ad54bf6d0ef93d6811445c7f9 Mon Sep 17 00:00:00 2001
+From: Samuel Cabrero <scabrero@suse.de>
+Date: Wed, 22 May 2024 13:31:06 +0200
+Subject: [PATCH] SYSDB: Use SYSDB_NAME from cached entry when updating users
+ and groups
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+The sysdb_store_user() and sysdb_store_group() functinos search for the
+entry by name to check if it is already cached. This search considers
+SYSDB_ALIAS, added when the domain is case insensitive. If a matching
+entry is found use its SYSDB_NAME instead of the passed name.
+
+It may happen the group is stored in uppercase, but later some server
+returns a memberOf attribute in lowercase. When updating the group to
+add the memberships the first search will find the entry, but the modify
+operation will fail as the group name in the built DN will differ in case.
+
+Signed-off-by: Samuel Cabrero <scabrero@suse.de>
+
+Reviewed-by: Alexey Tikhonov <atikhono@redhat.com>
+Reviewed-by: Pavel Březina <pbrezina@redhat.com>
+(cherry picked from commit d2b734b926e1f23370c9cabd8ba6f07bf6b29a86)
+
+Reviewed-by: Justin Stephenson <jstephen@redhat.com>
+---
+ src/db/sysdb_ops.c | 32 ++++++++++++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
+
+diff --git a/src/db/sysdb_ops.c b/src/db/sysdb_ops.c
+index 76f4580aa..32e49d759 100644
+--- a/src/db/sysdb_ops.c
++++ b/src/db/sysdb_ops.c
+@@ -2615,6 +2615,22 @@ int sysdb_store_user(struct sss_domain_info *domain,
+         }
+     } else {
+         /* the user exists, let's just replace attributes when set */
++        /*
++         * The sysdb_search_user_by_name() function also matches lowercased
++         * aliases, saved when the domain is case-insensitive. This means that
++         * the stored entry name can differ in capitalization from the search
++         * name. Use the cached entry name to perform the modification because
++         * if name capitalization in entry's DN differs the modify operation
++         * will fail.
++         */
++        const char *entry_name =
++            ldb_msg_find_attr_as_string(msg, SYSDB_NAME, NULL);
++        if (entry_name != NULL) {
++            name = entry_name;
++        } else {
++            DEBUG(SSSDBG_MINOR_FAILURE, "User '%s' without a name?\n", name);
++        }
++
+         ret = sysdb_store_user_attrs(domain, name, uid, gid, gecos, homedir,
+                                      shell, orig_dn, attrs, remove_attrs,
+                                      cache_timeout, now);
+@@ -2849,6 +2865,22 @@ int sysdb_store_group(struct sss_domain_info *domain,
+         ret = sysdb_store_new_group(domain, name, gid, attrs,
+                                     cache_timeout, now);
+     } else {
++        /*
++         * The sysdb_search_group_by_name() function also matches lowercased
++         * aliases, saved when the domain is case-insensitive. This means that
++         * the stored entry name can differ in capitalization from the search
++         * name. Use the cached entry name to perform the modification because
++         * if name capitalization in entry's DN differs the modify operation
++         * will fail.
++         */
++        const char *entry_name =
++            ldb_msg_find_attr_as_string(msg, SYSDB_NAME, NULL);
++        if (entry_name != NULL) {
++            name = entry_name;
++        } else {
++            DEBUG(SSSDBG_MINOR_FAILURE, "Group '%s' without a name?\n", name);
++        }
++
+         ret = sysdb_store_group_attrs(domain, name, gid, attrs,
+                                       cache_timeout, now);
+     }
+-- 
+2.47.0
+
