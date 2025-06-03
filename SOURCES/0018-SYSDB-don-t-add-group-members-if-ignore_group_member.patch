@@ -1,0 +1,444 @@
+From ac51851ab114b54d5485af5b20be7fa867c5d541 Mon Sep 17 00:00:00 2001
+From: Alexey Tikhonov <atikhono@redhat.com>
+Date: Fri, 14 Feb 2025 21:15:16 +0100
+Subject: [PATCH] SYSDB: don't add group members if 'ignore_group_members ==
+ true'
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Resolves: https://github.com/SSSD/sssd/issues/7793
+
+Reviewed-by: Alejandro López <allopez@redhat.com>
+Reviewed-by: Sumit Bose <sbose@redhat.com>
+(cherry picked from commit 281d9c3ed66ee28a9572433a629eb0d72525ca46)
+(cherry picked from commit addb1a78106cab8a85f8f6c56d79e84b5abd0d5e)
+
+Reviewed-by: Sumit Bose <sbose@redhat.com>
+---
+ src/db/sysdb.h                              |  51 ++++++---
+ src/db/sysdb_search.c                       |   6 +-
+ src/db/sysdb_views.c                        |  10 +-
+ src/tests/cmocka/test_responder_cache_req.c | 112 +++++++-------------
+ src/tests/cmocka/test_sysdb_ts_cache.c      |   6 +-
+ src/tools/sss_override.c                    |   2 +-
+ 6 files changed, 90 insertions(+), 97 deletions(-)
+
+diff --git a/src/db/sysdb.h b/src/db/sysdb.h
+index 55c6437f2..fb1ced009 100644
+--- a/src/db/sysdb.h
++++ b/src/db/sysdb.h
+@@ -276,19 +276,44 @@
+                         SYSDB_ORIG_DN, \
+                         NULL}
+ 
+-#define SYSDB_GRSRC_ATTRS {SYSDB_NAME, SYSDB_GIDNUM, \
+-                           SYSDB_MEMBERUID, \
+-                           SYSDB_MEMBER, \
+-                           SYSDB_GHOST, \
+-                           SYSDB_DEFAULT_ATTRS, \
+-                           SYSDB_SID_STR, \
+-                           SYSDB_OVERRIDE_DN, \
+-                           SYSDB_OVERRIDE_OBJECT_DN, \
+-                           SYSDB_DEFAULT_OVERRIDE_NAME, \
+-                           SYSDB_UUID, \
+-                           ORIGINALAD_PREFIX SYSDB_NAME, \
+-                           ORIGINALAD_PREFIX SYSDB_GIDNUM, \
+-                           NULL}
++/* Strictly speaking it should return 'const char * const *' but
++ * that gets really unreadable.
++ */
++__attribute__((always_inline))
++static inline const char **SYSDB_GRSRC_ATTRS(const struct sss_domain_info *domain)
++{
++    static const char * __SYSDB_GRSRC_ATTRS_NO_MEMBERS[] = {
++        SYSDB_NAME, SYSDB_GIDNUM,
++        SYSDB_DEFAULT_ATTRS,
++        SYSDB_SID_STR,
++        SYSDB_OVERRIDE_DN,
++        SYSDB_OVERRIDE_OBJECT_DN,
++        SYSDB_DEFAULT_OVERRIDE_NAME,
++        SYSDB_UUID,
++        NULL
++    };
++    static const char * __SYSDB_GRSRC_ATTRS_WITH_MEMBERS[] = {
++        SYSDB_NAME, SYSDB_GIDNUM,
++        SYSDB_MEMBERUID,
++        SYSDB_MEMBER,
++        SYSDB_GHOST,
++        SYSDB_DEFAULT_ATTRS,
++        SYSDB_SID_STR,
++        SYSDB_OVERRIDE_DN,
++        SYSDB_OVERRIDE_OBJECT_DN,
++        SYSDB_DEFAULT_OVERRIDE_NAME,
++        SYSDB_UUID,
++        ORIGINALAD_PREFIX SYSDB_NAME,
++        ORIGINALAD_PREFIX SYSDB_GIDNUM,
++        NULL
++    };
++
++    if (domain && domain->ignore_group_members) {
++        return __SYSDB_GRSRC_ATTRS_NO_MEMBERS;
++    } else {
++        return __SYSDB_GRSRC_ATTRS_WITH_MEMBERS;
++    }
++}
+ 
+ #define SYSDB_NETGR_ATTRS {SYSDB_NAME, SYSDB_NETGROUP_TRIPLE, \
+                            SYSDB_NETGROUP_MEMBER, \
+diff --git a/src/db/sysdb_search.c b/src/db/sysdb_search.c
+index e4c53b853..7f34ddbcb 100644
+--- a/src/db/sysdb_search.c
++++ b/src/db/sysdb_search.c
+@@ -1176,7 +1176,7 @@ int sysdb_getgrnam(TALLOC_CTX *mem_ctx,
+                    struct ldb_result **_res)
+ {
+     TALLOC_CTX *tmp_ctx;
+-    static const char *attrs[] = SYSDB_GRSRC_ATTRS;
++    const char **attrs = SYSDB_GRSRC_ATTRS(domain);
+     const char *fmt_filter;
+     char *sanitized_name;
+     struct ldb_dn *base_dn;
+@@ -1378,7 +1378,7 @@ int sysdb_getgrgid_attrs(TALLOC_CTX *mem_ctx,
+     struct ldb_dn *base_dn;
+     struct ldb_result *res = NULL;
+     int ret;
+-    static const char *default_attrs[] = SYSDB_GRSRC_ATTRS;
++    const char **default_attrs = SYSDB_GRSRC_ATTRS(domain);
+     const char **attrs = NULL;
+ 
+     tmp_ctx = talloc_new(NULL);
+@@ -1484,7 +1484,7 @@ int sysdb_enumgrent_filter(TALLOC_CTX *mem_ctx,
+                            struct ldb_result **_res)
+ {
+     TALLOC_CTX *tmp_ctx;
+-    static const char *attrs[] = SYSDB_GRSRC_ATTRS;
++    const char **attrs = SYSDB_GRSRC_ATTRS(domain);
+     const char *filter = NULL;
+     const char *ts_filter = NULL;
+     const char *base_filter;
+diff --git a/src/db/sysdb_views.c b/src/db/sysdb_views.c
+index 19c10977b..71f627974 100644
+--- a/src/db/sysdb_views.c
++++ b/src/db/sysdb_views.c
+@@ -1237,7 +1237,7 @@ errno_t sysdb_search_group_override_by_name(TALLOC_CTX *mem_ctx,
+                                             struct ldb_result **override_obj,
+                                             struct ldb_result **orig_obj)
+ {
+-    const char *attrs[] = SYSDB_GRSRC_ATTRS;
++    const char **attrs = SYSDB_GRSRC_ATTRS(domain);
+ 
+     return sysdb_search_override_by_name(mem_ctx, domain, name,
+                                          SYSDB_GROUP_NAME_OVERRIDE_FILTER,
+@@ -1253,7 +1253,7 @@ static errno_t sysdb_search_override_by_id(TALLOC_CTX *mem_ctx,
+ {
+     TALLOC_CTX *tmp_ctx;
+     static const char *user_attrs[] = SYSDB_PW_ATTRS;
+-    static const char *group_attrs[] = SYSDB_GRSRC_ATTRS;
++    const char **group_attrs = SYSDB_GRSRC_ATTRS(domain);
+     const char **attrs;
+     struct ldb_dn *base_dn;
+     struct ldb_result *override_res;
+@@ -1417,7 +1417,7 @@ errno_t sysdb_add_overrides_to_object(struct sss_domain_info *domain,
+     struct ldb_message *override;
+     uint64_t uid;
+     static const char *user_attrs[] = SYSDB_PW_ATTRS;
+-    static const char *group_attrs[] = SYSDB_GRSRC_ATTRS;
++    const char **group_attrs = SYSDB_GRSRC_ATTRS(domain); /* members don't matter */
+     const char **attrs;
+     struct attr_map {
+         const char *attr;
+@@ -1551,6 +1551,10 @@ errno_t sysdb_add_group_member_overrides(struct sss_domain_info *domain,
+     char *val;
+     struct sss_domain_info *orig_dom;
+ 
++    if (domain->ignore_group_members) {
++        return EOK;
++    }
++
+     tmp_ctx = talloc_new(NULL);
+     if (tmp_ctx == NULL) {
+         DEBUG(SSSDBG_OP_FAILURE, "talloc_new failed.\n");
+diff --git a/src/tests/cmocka/test_responder_cache_req.c b/src/tests/cmocka/test_responder_cache_req.c
+index fe69a9dfd..c665e1adb 100644
+--- a/src/tests/cmocka/test_responder_cache_req.c
++++ b/src/tests/cmocka/test_responder_cache_req.c
+@@ -3282,10 +3282,8 @@ void test_object_by_sid_user_multiple_domains_notfound(void **state)
+ 
+ void test_object_by_sid_group_cache_valid(void **state)
+ {
+-    struct cache_req_test_ctx *test_ctx = NULL;
+-    const char *attrs[] = SYSDB_GRSRC_ATTRS;
+-
+-    test_ctx = talloc_get_type_abort(*state, struct cache_req_test_ctx);
++    struct cache_req_test_ctx *test_ctx = talloc_get_type_abort(*state, struct cache_req_test_ctx);
++    const char **attrs = SYSDB_GRSRC_ATTRS(test_ctx->tctx->dom);
+ 
+     /* Setup user. */
+     prepare_group(test_ctx->tctx->dom, &groups[0], 1000, time(NULL));
+@@ -3298,10 +3296,8 @@ void test_object_by_sid_group_cache_valid(void **state)
+ 
+ void test_object_by_sid_group_cache_expired(void **state)
+ {
+-    struct cache_req_test_ctx *test_ctx = NULL;
+-    const char *attrs[] = SYSDB_GRSRC_ATTRS;
+-
+-    test_ctx = talloc_get_type_abort(*state, struct cache_req_test_ctx);
++    struct cache_req_test_ctx *test_ctx = talloc_get_type_abort(*state, struct cache_req_test_ctx);
++    const char **attrs = SYSDB_GRSRC_ATTRS(test_ctx->tctx->dom);
+ 
+     /* Setup user. */
+     prepare_group(test_ctx->tctx->dom, &groups[0], -1000, time(NULL));
+@@ -3320,10 +3316,8 @@ void test_object_by_sid_group_cache_expired(void **state)
+ 
+ void test_object_by_sid_group_cache_midpoint(void **state)
+ {
+-    struct cache_req_test_ctx *test_ctx = NULL;
+-    const char *attrs[] = SYSDB_GRSRC_ATTRS;
+-
+-    test_ctx = talloc_get_type_abort(*state, struct cache_req_test_ctx);
++    struct cache_req_test_ctx *test_ctx = talloc_get_type_abort(*state, struct cache_req_test_ctx);
++    const char **attrs = SYSDB_GRSRC_ATTRS(test_ctx->tctx->dom);
+ 
+     /* Setup user. */
+     prepare_group(test_ctx->tctx->dom, &groups[0], 50, time(NULL) - 26);
+@@ -3341,12 +3335,10 @@ void test_object_by_sid_group_cache_midpoint(void **state)
+ 
+ void test_object_by_sid_group_ncache(void **state)
+ {
+-    struct cache_req_test_ctx *test_ctx = NULL;
+-    const char *attrs[] = SYSDB_GRSRC_ATTRS;
++    struct cache_req_test_ctx *test_ctx = talloc_get_type_abort(*state, struct cache_req_test_ctx);
++    const char **attrs = SYSDB_GRSRC_ATTRS(test_ctx->tctx->dom);
+     errno_t ret;
+ 
+-    test_ctx = talloc_get_type_abort(*state, struct cache_req_test_ctx);
+-
+     /* Setup user. */
+     ret = sss_ncache_set_sid(test_ctx->ncache, false, test_ctx->tctx->dom, groups[0].sid);
+     assert_int_equal(ret, EOK);
+@@ -3359,10 +3351,8 @@ void test_object_by_sid_group_ncache(void **state)
+ 
+ void test_object_by_sid_group_missing_found(void **state)
+ {
+-    struct cache_req_test_ctx *test_ctx = NULL;
+-    const char *attrs[] = SYSDB_GRSRC_ATTRS;
+-
+-    test_ctx = talloc_get_type_abort(*state, struct cache_req_test_ctx);
++    struct cache_req_test_ctx *test_ctx = talloc_get_type_abort(*state, struct cache_req_test_ctx);
++    const char **attrs = SYSDB_GRSRC_ATTRS(test_ctx->tctx->dom);
+ 
+     /* Mock values. */
+     will_return(__wrap_sss_dp_get_account_send, test_ctx);
+@@ -3380,10 +3370,8 @@ void test_object_by_sid_group_missing_found(void **state)
+ 
+ void test_object_by_sid_group_missing_notfound(void **state)
+ {
+-    struct cache_req_test_ctx *test_ctx = NULL;
+-    const char *attrs[] = SYSDB_GRSRC_ATTRS;
+-
+-    test_ctx = talloc_get_type_abort(*state, struct cache_req_test_ctx);
++    struct cache_req_test_ctx *test_ctx = talloc_get_type_abort(*state, struct cache_req_test_ctx);
++    const char **attrs = SYSDB_GRSRC_ATTRS(test_ctx->tctx->dom);
+ 
+     /* Mock values. */
+     will_return(__wrap_sss_dp_get_account_send, test_ctx);
+@@ -3397,17 +3385,13 @@ void test_object_by_sid_group_missing_notfound(void **state)
+ 
+ void test_object_by_sid_group_multiple_domains_found(void **state)
+ {
+-    struct cache_req_test_ctx *test_ctx = NULL;
+-    struct sss_domain_info *domain = NULL;
+-    const char *attrs[] = SYSDB_GRSRC_ATTRS;
+-
+-    test_ctx = talloc_get_type_abort(*state, struct cache_req_test_ctx);
+-
+-    /* Setup user. */
+-    domain = find_domain_by_name(test_ctx->tctx->dom,
+-                                 "responder_cache_req_test_d", true);
++    struct cache_req_test_ctx *test_ctx = talloc_get_type_abort(*state, struct cache_req_test_ctx);
++    struct sss_domain_info *domain = find_domain_by_name(test_ctx->tctx->dom,
++                                         "responder_cache_req_test_d", true);
+     assert_non_null(domain);
++    const char **attrs = SYSDB_GRSRC_ATTRS(domain);
+ 
++    /* Setup user. */
+     prepare_group(domain, &groups[0], 1000, time(NULL));
+ 
+     /* Mock values. */
+@@ -3423,10 +3407,8 @@ void test_object_by_sid_group_multiple_domains_found(void **state)
+ 
+ void test_object_by_sid_group_multiple_domains_notfound(void **state)
+ {
+-    struct cache_req_test_ctx *test_ctx = NULL;
+-    const char *attrs[] = SYSDB_GRSRC_ATTRS;
+-
+-    test_ctx = talloc_get_type_abort(*state, struct cache_req_test_ctx);
++    struct cache_req_test_ctx *test_ctx = talloc_get_type_abort(*state, struct cache_req_test_ctx);
++    const char **attrs = SYSDB_GRSRC_ATTRS(test_ctx->tctx->dom);
+ 
+     /* Mock values. */
+     will_return_always(__wrap_sss_dp_get_account_send, test_ctx);
+@@ -3605,10 +3587,8 @@ void test_object_by_id_user_multiple_domains_notfound(void **state)
+ 
+ void test_object_by_id_group_cache_valid(void **state)
+ {
+-    struct cache_req_test_ctx *test_ctx = NULL;
+-    const char *attrs[] = SYSDB_GRSRC_ATTRS;
+-
+-    test_ctx = talloc_get_type_abort(*state, struct cache_req_test_ctx);
++    struct cache_req_test_ctx *test_ctx = talloc_get_type_abort(*state, struct cache_req_test_ctx);
++    const char **attrs = SYSDB_GRSRC_ATTRS(test_ctx->tctx->dom);
+ 
+     /* Setup user. */
+     prepare_group(test_ctx->tctx->dom, &groups[0], 1000, time(NULL));
+@@ -3620,10 +3600,8 @@ void test_object_by_id_group_cache_valid(void **state)
+ 
+ void test_object_by_id_group_cache_expired(void **state)
+ {
+-    struct cache_req_test_ctx *test_ctx = NULL;
+-    const char *attrs[] = SYSDB_GRSRC_ATTRS;
+-
+-    test_ctx = talloc_get_type_abort(*state, struct cache_req_test_ctx);
++    struct cache_req_test_ctx *test_ctx = talloc_get_type_abort(*state, struct cache_req_test_ctx);
++    const char **attrs = SYSDB_GRSRC_ATTRS(test_ctx->tctx->dom);
+ 
+     /* Setup user. */
+     prepare_group(test_ctx->tctx->dom, &groups[0], -1000, time(NULL));
+@@ -3641,10 +3619,8 @@ void test_object_by_id_group_cache_expired(void **state)
+ 
+ void test_object_by_id_group_cache_midpoint(void **state)
+ {
+-    struct cache_req_test_ctx *test_ctx = NULL;
+-    const char *attrs[] = SYSDB_GRSRC_ATTRS;
+-
+-    test_ctx = talloc_get_type_abort(*state, struct cache_req_test_ctx);
++    struct cache_req_test_ctx *test_ctx = talloc_get_type_abort(*state, struct cache_req_test_ctx);
++    const char **attrs = SYSDB_GRSRC_ATTRS(test_ctx->tctx->dom);
+ 
+     /* Setup user. */
+     prepare_group(test_ctx->tctx->dom, &groups[0], 50, time(NULL) - 26);
+@@ -3661,12 +3637,10 @@ void test_object_by_id_group_cache_midpoint(void **state)
+ 
+ void test_object_by_id_group_ncache(void **state)
+ {
+-    struct cache_req_test_ctx *test_ctx = NULL;
+-    const char *attrs[] = SYSDB_GRSRC_ATTRS;
++    struct cache_req_test_ctx *test_ctx = talloc_get_type_abort(*state, struct cache_req_test_ctx);
++    const char **attrs = SYSDB_GRSRC_ATTRS(test_ctx->tctx->dom);
+     errno_t ret;
+ 
+-    test_ctx = talloc_get_type_abort(*state, struct cache_req_test_ctx);
+-
+     /* Setup group. We explicitly add the UID into BOTH UID and GID
+      * namespaces, because otherwise the cache_req plugin would
+      * search the Data Provider anyway, because it can't be sure
+@@ -3693,10 +3667,8 @@ void test_object_by_id_group_ncache(void **state)
+ 
+ void test_object_by_id_group_missing_found(void **state)
+ {
+-    struct cache_req_test_ctx *test_ctx = NULL;
+-    const char *attrs[] = SYSDB_GRSRC_ATTRS;
+-
+-    test_ctx = talloc_get_type_abort(*state, struct cache_req_test_ctx);
++    struct cache_req_test_ctx *test_ctx = talloc_get_type_abort(*state, struct cache_req_test_ctx);
++    const char **attrs = SYSDB_GRSRC_ATTRS(test_ctx->tctx->dom);
+ 
+     /* Mock values. */
+     will_return(__wrap_sss_dp_get_account_send, test_ctx);
+@@ -3713,10 +3685,8 @@ void test_object_by_id_group_missing_found(void **state)
+ 
+ void test_object_by_id_group_missing_notfound(void **state)
+ {
+-    struct cache_req_test_ctx *test_ctx = NULL;
+-    const char *attrs[] = SYSDB_GRSRC_ATTRS;
+-
+-    test_ctx = talloc_get_type_abort(*state, struct cache_req_test_ctx);
++    struct cache_req_test_ctx *test_ctx = talloc_get_type_abort(*state, struct cache_req_test_ctx);
++    const char **attrs = SYSDB_GRSRC_ATTRS(test_ctx->tctx->dom);
+ 
+     /* Mock values. */
+     will_return(__wrap_sss_dp_get_account_send, test_ctx);
+@@ -3729,17 +3699,13 @@ void test_object_by_id_group_missing_notfound(void **state)
+ 
+ void test_object_by_id_group_multiple_domains_found(void **state)
+ {
+-    struct cache_req_test_ctx *test_ctx = NULL;
+-    struct sss_domain_info *domain = NULL;
+-    const char *attrs[] = SYSDB_GRSRC_ATTRS;
+-
+-    test_ctx = talloc_get_type_abort(*state, struct cache_req_test_ctx);
+-
+-    /* Setup user. */
+-    domain = find_domain_by_name(test_ctx->tctx->dom,
+-                                 "responder_cache_req_test_d", true);
++    struct cache_req_test_ctx *test_ctx = talloc_get_type_abort(*state, struct cache_req_test_ctx);
++    struct sss_domain_info *domain = find_domain_by_name(test_ctx->tctx->dom,
++                                         "responder_cache_req_test_d", true);
+     assert_non_null(domain);
++    const char **attrs = SYSDB_GRSRC_ATTRS(domain);
+ 
++    /* Setup user. */
+     prepare_group(domain, &groups[0], 1000, time(NULL));
+ 
+     /* Mock values. */
+@@ -3755,10 +3721,8 @@ void test_object_by_id_group_multiple_domains_found(void **state)
+ 
+ void test_object_by_id_group_multiple_domains_notfound(void **state)
+ {
+-    struct cache_req_test_ctx *test_ctx = NULL;
+-    const char *attrs[] = SYSDB_GRSRC_ATTRS;
+-
+-    test_ctx = talloc_get_type_abort(*state, struct cache_req_test_ctx);
++    struct cache_req_test_ctx *test_ctx = talloc_get_type_abort(*state, struct cache_req_test_ctx);
++    const char **attrs = SYSDB_GRSRC_ATTRS(test_ctx->tctx->dom);
+ 
+     /* Mock values. */
+     will_return_always(__wrap_sss_dp_get_account_send, test_ctx);
+diff --git a/src/tests/cmocka/test_sysdb_ts_cache.c b/src/tests/cmocka/test_sysdb_ts_cache.c
+index 24b26d950..f349b7061 100644
+--- a/src/tests/cmocka/test_sysdb_ts_cache.c
++++ b/src/tests/cmocka/test_sysdb_ts_cache.c
+@@ -694,7 +694,7 @@ static void test_sysdb_getgr_merges(void **state)
+     struct sysdb_ts_test_ctx *test_ctx = talloc_get_type_abort(*state,
+                                                      struct sysdb_ts_test_ctx);
+     struct sysdb_attrs *group_attrs = NULL;
+-    const char *gr_fetch_attrs[] = SYSDB_GRSRC_ATTRS;
++    const char **gr_fetch_attrs = SYSDB_GRSRC_ATTRS(test_ctx->tctx->dom);
+     char *filter = NULL;
+     struct ldb_result *res = NULL;
+     size_t msgs_count;
+@@ -783,7 +783,7 @@ static void test_merge_ldb_results(void **state)
+     int ret;
+     struct sysdb_ts_test_ctx *test_ctx = talloc_get_type_abort(*state,
+                                                      struct sysdb_ts_test_ctx);
+-    const char *gr_fetch_attrs[] = SYSDB_GRSRC_ATTRS;
++    const char **gr_fetch_attrs = SYSDB_GRSRC_ATTRS(test_ctx->tctx->dom);
+     char *filter;
+     struct ldb_result *res;
+     struct ldb_result *res1;
+@@ -856,7 +856,7 @@ static void test_group_bysid(void **state)
+     int ret;
+     struct sysdb_ts_test_ctx *test_ctx = talloc_get_type_abort(*state,
+                                                      struct sysdb_ts_test_ctx);
+-    const char *gr_fetch_attrs[] = SYSDB_GRSRC_ATTRS;
++    const char **gr_fetch_attrs = SYSDB_GRSRC_ATTRS(test_ctx->tctx->dom);
+     struct sysdb_attrs *group_attrs = NULL;
+     struct ldb_result *res;
+     struct ldb_message *msg = NULL;
+diff --git a/src/tools/sss_override.c b/src/tools/sss_override.c
+index cfd8f17fa..a20859c4d 100644
+--- a/src/tools/sss_override.c
++++ b/src/tools/sss_override.c
+@@ -1218,7 +1218,7 @@ list_group_overrides(TALLOC_CTX *mem_ctx,
+     size_t count;
+     size_t i;
+     errno_t ret;
+-    const char *attrs[] = SYSDB_GRSRC_ATTRS;
++    const char **attrs = SYSDB_GRSRC_ATTRS(domain);
+     const char *fqname;
+     char *name;
+ 
+-- 
+2.47.0
+

@@ -19,7 +19,7 @@
 
 Name: sssd
 Version: 2.9.4
-Release: 5%{?dist}.1
+Release: 5%{?dist}.2
 Group: Applications/System
 Summary: System Security Services Daemon
 License: GPLv3+
@@ -42,6 +42,10 @@ Patch0012: 0012-sysdb-do-not-fail-to-add-non-posix-user-to-MPG-domai.patch
 Patch0013: 0013-ldap-add-exop_force-value-for-ldap_pwmodify_mode.patch
 Patch0014: 0014-DEBUG-reduce-log-level-in-case-a-responder-asks-for-.patch
 Patch0015: 0015-ldap_child-make-sure-invalid-krb5-context-is-not-use.patch
+Patch0016: 0016-KCM-fix-memory-leak.patch
+Patch0017: 0017-KCM-another-memory-leak-fixed.patch
+Patch0018: 0018-SYSDB-don-t-add-group-members-if-ignore_group_member.patch
+Patch0019: 0019-SYSDB-Use-SYSDB_NAME-from-cached-entry-when-updating.patch
 
 ### Downstream Patches ###
 
@@ -1226,6 +1230,11 @@ fi
 %systemd_postun_with_restart sssd.service
 
 %changelog
+* Fri Apr 25 2025 Alexey Tikhonov <atikhono@redhat.com> - 2.9.4-5.2
+- Resolves: RHEL-78300 - 'sssd_kcm' leaks memory [rhel-8.10.z]
+- Resolves: RHEL-82420 - Disk cache failure with large db sizes [rhel-8.10.z]
+- Resolves: RHEL-76022 - Use the DN from existing entry when updating a cached group [rhel-8.10.z]
+
 * Fri Nov 22 2024 Alexey Tikhonov <atikhono@redhat.com> - 2.9.4-5.1
 - Resolves: RHEL-67671 - Label DP_OPT_DYNDNS_REFRESH_OFFSET has no corresponding option [rhel-8.10.z]
 - Resolves: RHEL-68507 - sssd backend process segfaults when krb5.conf is invalid [rhel-8.10.z]
