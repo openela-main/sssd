@@ -19,7 +19,7 @@
 
 Name: sssd
 Version: 2.9.4
-Release: 5%{?dist}.2
+Release: 5%{?dist}.3
 Group: Applications/System
 Summary: System Security Services Daemon
 License: GPLv3+
@@ -46,6 +46,8 @@ Patch0016: 0016-KCM-fix-memory-leak.patch
 Patch0017: 0017-KCM-another-memory-leak-fixed.patch
 Patch0018: 0018-SYSDB-don-t-add-group-members-if-ignore_group_member.patch
 Patch0019: 0019-SYSDB-Use-SYSDB_NAME-from-cached-entry-when-updating.patch
+Patch0020: 0020-p11_child-Add-timeout-parameter.patch
+Patch0021: 0021-krb5-disable-Kerberos-localauth-an2ln-plugin-for-AD-.patch
 
 ### Downstream Patches ###
 
@@ -1230,6 +1232,10 @@ fi
 %systemd_postun_with_restart sssd.service
 
 %changelog
+* Fri Oct 17 2025 Alejandro López <allopez@redhat.com> - 2.9.4-5.3
+- Resolves: RHEL-112455 - p11_child currently has an infinite timeout [rhel-8.10.z]
+- Resolves: RHEL-120292 - CVE-2025-11561 sssd: SSSD default Kerberos configuration allows privilege escalation on AD-joined Linux systems [rhel-8.10.z]	
+
 * Fri Apr 25 2025 Alexey Tikhonov <atikhono@redhat.com> - 2.9.4-5.2
 - Resolves: RHEL-78300 - 'sssd_kcm' leaks memory [rhel-8.10.z]
 - Resolves: RHEL-82420 - Disk cache failure with large db sizes [rhel-8.10.z]

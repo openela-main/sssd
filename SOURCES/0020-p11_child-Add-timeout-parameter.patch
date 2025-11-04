@@ -1,0 +1,262 @@
+From 629cb8dfc8077f13464a47bf9af5bdc9c2e9b950 Mon Sep 17 00:00:00 2001
+From: Tomas Halman <thalman@redhat.com>
+Date: Thu, 20 Mar 2025 18:11:40 +0100
+Subject: [PATCH] p11_child: Add timeout parameter
+
+p11_child communication with OCSP server may take a long time
+because of network issues. Then p11_child is killed after
+`p11_child_timeout` and the authentication fails.
+
+This is not desirable when `certificate_verification` is
+set to `soft_ocsp`. This update will pass the timeout to the
+child process so it can cancel the OCSP verification
+before it is terminated.
+
+Resolves: https://github.com/SSSD/sssd/issues/6601
+
+Reviewed-by: Alexey Tikhonov <atikhono@redhat.com>
+Reviewed-by: Scott Poore <spoore@redhat.com>
+Reviewed-by: Sumit Bose <sbose@redhat.com>
+(cherry picked from commit 2cf2e83a223f0eb74bd81a7fcaf726c62d577719)
+
+Reviewed-by: Alexey Tikhonov <atikhono@redhat.com>
+---
+ src/p11_child/p11_child.h               |  4 +++-
+ src/p11_child/p11_child_common.c        | 19 +++++++++++++---
+ src/p11_child/p11_child_openssl.c       | 29 ++++++++++++++++++++++---
+ src/responder/ifp/ifp_users.c           | 12 +++++++++-
+ src/responder/pam/pamsrv_p11.c          | 12 +++++++++-
+ src/responder/ssh/ssh_cert_to_ssh_key.c | 10 ++++++++-
+ 6 files changed, 76 insertions(+), 10 deletions(-)
+
+diff --git a/src/p11_child/p11_child.h b/src/p11_child/p11_child.h
+index e3547ce23..2bc83990c 100644
+--- a/src/p11_child/p11_child.h
++++ b/src/p11_child/p11_child.h
+@@ -27,6 +27,7 @@
+ 
+ /* for CK_MECHANISM_TYPE */
+ #include <p11-kit/pkcs11.h>
++#include <time.h>
+ 
+ /* Time to wait for new slot events. */
+ #define PKCS11_SLOT_EVENT_WAIT_TIME 1
+@@ -59,7 +60,8 @@ enum pin_mode {
+ };
+ 
+ errno_t init_p11_ctx(TALLOC_CTX *mem_ctx, const char *ca_db,
+-                     bool wait_for_card, struct p11_ctx **p11_ctx);
++                     bool wait_for_card, time_t timeout,
++                     struct p11_ctx **p11_ctx);
+ 
+ errno_t init_verification(struct p11_ctx *p11_ctx,
+                           struct cert_verify_opts *cert_verify_opts);
+diff --git a/src/p11_child/p11_child_common.c b/src/p11_child/p11_child_common.c
+index 5eab9b063..9d690669c 100644
+--- a/src/p11_child/p11_child_common.c
++++ b/src/p11_child/p11_child_common.c
+@@ -63,12 +63,12 @@ static int do_work(TALLOC_CTX *mem_ctx, enum op_mode mode, const char *ca_db,
+                    const char *cert_b64, const char *pin,
+                    const char *module_name, const char *token_name,
+                    const char *key_id, const char *label, const char *uri,
+-                   char **multi)
++                   time_t timeout, char **multi)
+ {
+     int ret;
+     struct p11_ctx *p11_ctx;
+ 
+-    ret = init_p11_ctx(mem_ctx, ca_db, wait_for_card, &p11_ctx);
++    ret = init_p11_ctx(mem_ctx, ca_db, wait_for_card, timeout, &p11_ctx);
+     if (ret != EOK) {
+         DEBUG(SSSDBG_OP_FAILURE, "init_p11_ctx failed.\n");
+         return ret;
+@@ -165,6 +165,7 @@ int main(int argc, const char *argv[])
+     char *label = NULL;
+     char *cert_b64 = NULL;
+     long chain_id = 0;
++    long timeout = -1;
+     bool wait_for_card = false;
+     char *uri = NULL;
+ 
+@@ -202,6 +203,8 @@ int main(int argc, const char *argv[])
+          _("PKCS#11 URI to restrict selection"), NULL},
+         {"chain-id", 0, POPT_ARG_LONG, &chain_id,
+          0, _("Tevent chain ID used for logging purposes"), NULL},
++        {"timeout", 0, POPT_ARG_LONG, &timeout,
++         0, _("OCSP communication timeout"), NULL},
+         POPT_TABLEEND
+     };
+ 
+@@ -382,9 +385,19 @@ int main(int argc, const char *argv[])
+         }
+     }
+ 
++    /* sanity check for timeout value */
++    if (timeout > INT32_MAX) {
++        fprintf(stderr,
++                "Timeout value [%li] is too long, using [%d]\n",
++                timeout, INT32_MAX);
++        timeout = INT32_MAX;
++    } else if (timeout < -1) {
++        timeout = -1;
++    }
++
+     ret = do_work(main_ctx, mode, ca_db, cert_verify_opts, wait_for_card,
+                   cert_b64, pin, module_name, token_name, key_id, label, uri,
+-                  &multi);
++                  timeout, &multi);
+ 
+ done:
+     fprintf(stdout, "%d\n%s", ret, multi ? multi : "");
+diff --git a/src/p11_child/p11_child_openssl.c b/src/p11_child/p11_child_openssl.c
+index 45a4930ba..468d8cf5c 100644
+--- a/src/p11_child/p11_child_openssl.c
++++ b/src/p11_child/p11_child_openssl.c
+@@ -44,6 +44,7 @@ struct p11_ctx {
+     const char *ca_db;
+     bool wait_for_card;
+     struct cert_verify_opts *cert_verify_opts;
++    time_t ocsp_deadline;
+ };
+ 
+ static OCSP_RESPONSE *query_responder(BIO *cbio, const char *host,
+@@ -390,8 +391,19 @@ static errno_t do_ocsp(struct p11_ctx *p11_ctx, X509 *cert)
+ 
+     OCSP_request_add1_nonce(ocsp_req, NULL, -1);
+ 
+-    ocsp_resp = process_responder(ocsp_req, host, path, port, use_ssl,
+-                                  req_timeout);
++    if (p11_ctx->ocsp_deadline != -1  && p11_ctx->cert_verify_opts->soft_ocsp) {
++        req_timeout = p11_ctx->ocsp_deadline - time(NULL);
++        if (req_timeout <= 0) {
++            /* no time left for OCSP */
++            DEBUG(SSSDBG_TRACE_INTERNAL,
++                  "Timeout before we could run OCSP request.\n");
++            req_timeout = 0;
++        }
++    }
++    if (req_timeout != 0) {
++        ocsp_resp = process_responder(ocsp_req, host, path, port, use_ssl,
++                                      req_timeout);
++    }
+     if (ocsp_resp == NULL) {
+         if (p11_ctx->cert_verify_opts->soft_ocsp) {
+             tmp_str = get_issuer_subject_str(p11_ctx, cert);
+@@ -580,7 +592,8 @@ static int p11_ctx_destructor(struct p11_ctx *p11_ctx)
+ }
+ 
+ errno_t init_p11_ctx(TALLOC_CTX *mem_ctx, const char *ca_db,
+-                     bool wait_for_card, struct p11_ctx **p11_ctx)
++                     bool wait_for_card, time_t timeout,
++                     struct p11_ctx **p11_ctx)
+ {
+     int ret;
+     struct p11_ctx *ctx;
+@@ -591,6 +604,16 @@ errno_t init_p11_ctx(TALLOC_CTX *mem_ctx, const char *ca_db,
+         return ENOMEM;
+     }
+ 
++    if (timeout == 1) {
++        /* timeout of 1 sec is too short (see -1 in deadline calculation),
++         * increasing to 2 and hope that the ocsp operation finishes
++         * before p11_child is terminated.
++         */
++        timeout = 2;
++    }
++    /* timeout <= 0 means no timeout specified */
++    ctx->ocsp_deadline = timeout > 0 ? time(NULL) + timeout - 1 : -1;
++
+     /* See https://wiki.openssl.org/index.php/Library_Initialization for
+      * details. */
+ #if OPENSSL_VERSION_NUMBER >= 0x10100000L
+diff --git a/src/responder/ifp/ifp_users.c b/src/responder/ifp/ifp_users.c
+index 7acd46ef1..6c147d74d 100644
+--- a/src/responder/ifp/ifp_users.c
++++ b/src/responder/ifp/ifp_users.c
+@@ -1128,7 +1128,7 @@ ifp_users_find_by_valid_cert_send(TALLOC_CTX *mem_ctx,
+         goto done;
+     }
+ 
+-    state->extra_args = talloc_zero_array(state, const char *, 8);
++    state->extra_args = talloc_zero_array(state, const char *, 10);
+     if (state->extra_args == NULL) {
+         DEBUG(SSSDBG_OP_FAILURE, "talloc_zero_array failed.\n");
+         ret = ENOMEM;
+@@ -1143,6 +1143,16 @@ ifp_users_find_by_valid_cert_send(TALLOC_CTX *mem_ctx,
+         state->extra_args[arg_c++] = "--verify";
+     }
+     state->extra_args[arg_c++] = "--verification";
++    if (state->timeout > 0) {
++        state->extra_args[arg_c++] = talloc_asprintf(state, "%d",
++                                                     state->timeout);
++        if (state->extra_args[arg_c - 1] == NULL) {
++            DEBUG(SSSDBG_OP_FAILURE, "talloc_asprintf failed.\n");
++            ret = ENOMEM;
++            goto done;
++        }
++        state->extra_args[arg_c++] = "--timeout";
++    }
+ 
+     ret = p11_child_exec(req);
+ 
+diff --git a/src/responder/pam/pamsrv_p11.c b/src/responder/pam/pamsrv_p11.c
+index 2f973d89f..1490ca28d 100644
+--- a/src/responder/pam/pamsrv_p11.c
++++ b/src/responder/pam/pamsrv_p11.c
+@@ -746,7 +746,7 @@ struct tevent_req *pam_check_cert_send(TALLOC_CTX *mem_ctx,
+     struct timeval tv;
+     int pipefd_to_child[2] = PIPE_INIT;
+     int pipefd_from_child[2] = PIPE_INIT;
+-    const char *extra_args[20] = { NULL };
++    const char *extra_args[22] = { NULL };
+     uint8_t *write_buf = NULL;
+     size_t write_buf_len = 0;
+     size_t arg_c;
+@@ -778,6 +778,16 @@ struct tevent_req *pam_check_cert_send(TALLOC_CTX *mem_ctx,
+     /* extra_args are added in revers order */
+     arg_c = 0;
+ 
++    if (timeout > 0) {
++        extra_args[arg_c++] = talloc_asprintf(mem_ctx, "%lu", timeout);
++        if (extra_args[arg_c - 1] == NULL) {
++            DEBUG(SSSDBG_CRIT_FAILURE, "talloc_asprintf failed.\n");
++            ret = ENOMEM;
++            goto done;
++        }
++        extra_args[arg_c++] = "--timeout";
++    }
++
+     chain_id = sss_chain_id_get();
+ 
+     extra_args[arg_c++] = talloc_asprintf(mem_ctx, "%lu", chain_id);
+diff --git a/src/responder/ssh/ssh_cert_to_ssh_key.c b/src/responder/ssh/ssh_cert_to_ssh_key.c
+index b8bc8b7ab..53c33c279 100644
+--- a/src/responder/ssh/ssh_cert_to_ssh_key.c
++++ b/src/responder/ssh/ssh_cert_to_ssh_key.c
+@@ -91,7 +91,7 @@ struct tevent_req *cert_to_ssh_key_send(TALLOC_CTX *mem_ctx,
+     }
+     state->valid_keys = 0;
+ 
+-    state->extra_args = talloc_zero_array(state, const char *, 8);
++    state->extra_args = talloc_zero_array(state, const char *, 10);
+     if (state->extra_args == NULL) {
+         DEBUG(SSSDBG_OP_FAILURE, "talloc_zero_array failed.\n");
+         ret = ENOMEM;
+@@ -108,6 +108,14 @@ struct tevent_req *cert_to_ssh_key_send(TALLOC_CTX *mem_ctx,
+         state->extra_args[arg_c++] = "--verify";
+     }
+     state->extra_args[arg_c++] = "--verification";
++    if (timeout > 0) {
++        state->extra_args[arg_c++] = talloc_asprintf(state, "%lu", timeout);
++        if (state->extra_args[arg_c - 1] == NULL) {
++            ret = ENOMEM;
++            goto done;
++        }
++        state->extra_args[arg_c++] = "--timeout";
++    }
+ 
+     state->certs = talloc_zero_array(state, const char *, cert_count);
+     if (state->certs == NULL) {
+-- 
+2.51.0
+
