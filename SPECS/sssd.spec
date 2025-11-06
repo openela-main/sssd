@@ -57,7 +57,7 @@
 
 Name: sssd
 Version: 2.10.2
-Release: 3%{?dist}.2
+Release: 3%{?dist}.3
 Summary: System Security Services Daemon
 License: GPL-3.0-or-later
 URL: https://github.com/SSSD/sssd/
@@ -68,6 +68,7 @@ Source1: sssd.sysusers
 Patch0001: 0001-KCM-fix-memory-leak.patch
 Patch0002: 0002-KCM-another-memory-leak-fixed.patch
 Patch0003: 0003-SYSDB-don-t-add-group-members-if-ignore_group_member.patch
+Patch0004: 0004-krb5-disable-Kerberos-localauth-an2ln-plugin-for-AD-.patch
 
 ### Dependencies ###
 
@@ -1118,6 +1119,9 @@ fi
 %systemd_postun_with_restart sssd.service
 
 %changelog
+* Mon Oct 20 2025 Masahiro Matsuya <mmatsuya@redhat.com> - 2.10.2-3.3
+- Resolves: RHEL-120286 - CVE-2025-11561 sssd: SSSD default Kerberos configuration allows privilege escalation on AD-joined Linux systems [rhel-10.0.z]
+
 * Mon Apr  7 2025 Alexey Tikhonov <atikhono@redhat.com> - 2.10.2-3.2
 - Resolves: RHEL-79158 - Disk cache failure with large db sizes
 
