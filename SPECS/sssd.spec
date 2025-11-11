@@ -1,48 +1,14 @@
-# SSSD SPEC file for Fedora 34+ and RHEL-9+
+# SSSD SPEC file for RHEL-10
 
-# define SSSD user
-%if 0%{?fedora} >= 41 || 0%{?rhel}
 %global use_sssd_user 1
 %global sssd_user sssd
-%else
-%global use_sssd_user 0
-%global sssd_user root
-%endif
-
-# sysusers depends on presence of sssd user
-%if 0%{?fedora} >= 41 || 0%{?rhel} >= 10
 %global use_sysusers 1
-%else
-%global use_sysusers 0
-%endif
-
-%if 0%{?fedora} >= 35 || 0%{?rhel} >= 9
 %global build_subid 1
-%else
-%global build_subid 0
-%endif
-
-%if 0%{?fedora} >= 34
-%global build_kcm_renewals 1
-%global krb5_version 1.19.1
-%elif 0%{?rhel} >= 8
 %global build_kcm_renewals 1
 %global krb5_version 1.18.2
-%else
-%global build_kcm_renewals 0
-%endif
-
-%if 0%{?fedora} >= 39 || 0%{?rhel} >= 9
 %global build_passkey 1
-%else
-%global build_passkey 0
-%endif
-
-%if 0%{?fedora} >= 41 || 0%{?rhel} >= 10
+%global build_idp 0
 %global build_ssh_known_hosts_proxy 0
-%else
-%global build_ssh_known_hosts_proxy 1
-%endif
 
 # we don't want to provide private python extension libs
 %define __provides_exclude_from %{python3_sitearch}/.*\.so$
@@ -56,19 +22,16 @@
 %global samba_package_version %(rpm -q samba-devel --queryformat %{version})
 
 Name: sssd
-Version: 2.10.2
-Release: 3%{?dist}.3
+Version: 2.11.1
+Release: 2%{?dist}
 Summary: System Security Services Daemon
 License: GPL-3.0-or-later
 URL: https://github.com/SSSD/sssd/
-Source0: https://github.com/SSSD/sssd/releases/download/2.10.2/sssd-2.10.2.tar.gz
+Source0: https://github.com/SSSD/sssd/releases/download/2.11.1/sssd-2.11.1.tar.gz
 Source1: sssd.sysusers
 
 ### Patches ###
-Patch0001: 0001-KCM-fix-memory-leak.patch
-Patch0002: 0002-KCM-another-memory-leak-fixed.patch
-Patch0003: 0003-SYSDB-don-t-add-group-members-if-ignore_group_member.patch
-Patch0004: 0004-krb5-disable-Kerberos-localauth-an2ln-plugin-for-AD-.patch
+Patch0001: 0001-Revert-ipa-improve-handling-of-external-group-member.patch
 
 ### Dependencies ###
 
@@ -166,7 +129,9 @@ BuildRequires: systemtap-sdt-devel
 BuildRequires: systemtap-sdt-dtrace
 BuildRequires: uid_wrapper
 BuildRequires: po4a
+%ifarch %{valgrind_arches}
 BuildRequires: valgrind-devel
+%endif
 %if %{build_subid}
 BuildRequires: shadow-utils-subid-devel
 %endif
@@ -533,7 +498,7 @@ enable authentication with passkey token.
 %endif
 
 %prep
-%autosetup -n sssd-2.10.2 -p1
+%autosetup -n sssd-2.11.1 -p1
 
 %build
 
@@ -568,6 +533,9 @@ autoreconf -ivf
 %endif
 %if %{build_ssh_known_hosts_proxy}
     --with-ssh-known-hosts-proxy \
+%endif
+%if ! %{build_idp}
+    --with-id-provider-idp=no
 %endif
     %{nil}
 
@@ -1013,6 +981,10 @@ install -D -p -m 0644 %{SOURCE1} %{buildroot}%{_sysusersdir}/sssd.conf
 %{_mandir}/man8/sssd-kcm.8*
 
 %files idp
+%if %{build_idp}
+%{_libdir}/%{name}/libsss_idp.so
+%{_mandir}/man5/sssd-idp.5*
+%endif
 %{_libexecdir}/%{servicename}/oidc_child
 %{_libdir}/%{name}/modules/sssd_krb5_idp_plugin.so
 %{_datadir}/sssd/krb5-snippets/sssd_enable_idp
@@ -1031,7 +1003,7 @@ install -D -p -m 0644 %{SOURCE1} %{buildroot}%{_sysusersdir}/sssd.conf
 
 %if %{use_sssd_user}
 %pre common
-! getent passwd sssd >/dev/null || usermod sssd -d /run/sssd >/dev/null || true
+! getent passwd sssd >/dev/null || usermod sssd -d /run/sssd >/dev/null 2>&1 || true
 %if %{use_sysusers}
 %sysusers_create_compat %{SOURCE1}
 %else
@@ -1052,6 +1024,7 @@ getent passwd sssd >/dev/null || useradd -r -g sssd -d /run/sssd -s /sbin/nologi
 %__rm -f %{mcpath}/group
 %__rm -f %{mcpath}/initgroups
 %__rm -f %{mcpath}/sid
+%__rm -f %{pubconfpath}/known_hosts
 %__chown -f -R root:%{sssd_user} %{_sysconfdir}/sssd || true
 %__chmod -f -R g+r %{_sysconfdir}/sssd || true
 %__chown -f %{sssd_user}:%{sssd_user} %{dbpath}/* || true
@@ -1119,8 +1092,34 @@ fi
 %systemd_postun_with_restart sssd.service
 
 %changelog
-* Mon Oct 20 2025 Masahiro Matsuya <mmatsuya@redhat.com> - 2.10.2-3.3
-- Resolves: RHEL-120286 - CVE-2025-11561 sssd: SSSD default Kerberos configuration allows privilege escalation on AD-joined Linux systems [rhel-10.0.z]
+* Thu Aug 14 2025 Alexey Tikhonov <atikhono@redhat.com> - 2.11.1-2
+- Related: RHEL-77184 - AD user in external group is not cleared when expiring the cache
+  Patch used to fix this ticket causes a regression (RHEL-106987) and is being reverted.
+
+* Thu Jul 31 2025 Alexey Tikhonov <atikhono@redhat.com> - 2.11.1-1
+- Resolves: RHEL-95058 - Rebase SSSD for RHEL 10.1
+- Resolves: RHEL-77184 - AD user in external group is not cleared when expiring the cache
+
+* Fri Jun 13 2025 Alexey Tikhonov <atikhono@redhat.com> - 2.11.0-3
+- Related: RHEL-89870 - Rebase Samba to the latest 4.22.x release
+
+* Fri Jun  6 2025 Alexey Tikhonov <atikhono@redhat.com> - 2.11.0-2
+- Resolves: RHEL-95058 - Rebase SSSD for RHEL 10.1
+
+* Thu Jun  5 2025 Alexey Tikhonov <atikhono@redhat.com> - 2.11.0-1
+- Resolves: RHEL-95058 - Rebase SSSD for RHEL 10.1
+- Resolves: RHEL-4976 - [RFE] Continue searching other PKCS#11 tokens if certificates are not found
+- Resolves: RHEL-87200 - SSSD fails to connect with ipv4_first when on a machine with only IPv6 and server is dual-stack
+- Resolves: RHEL-25593 - Improve sssd-simple man page description
+- Resolves: RHEL-14752 - [RFE] Add IPA subdomain support to allow IPA-IPA trust
+- Resolves: RHEL-92569 - SSSD LDAPU1 Mapping braces problem
+- Resolves: RHEL-4981 - p11_child currently has an infinite timeout
+- Resolves: RHEL-5042 - IDM homedir %%o is not working, returns /home/domain/user instead of AD POSIX unixHomeDir
+- Resolves: RHEL-13086 - [RFE] Anonymous bind requests on RootDSE
+- Resolves: RHEL-45824 - SSSD unable to enumerate LDAP groups if LDAP server contains any group with # character in their names
+
+* Fri May  2 2025 Andrea Bolognani <abologna@redhat.com> - 2.10.2-4
+- Resolves: RHEL-89474 - Fails to build on riscv64
 
 * Mon Apr  7 2025 Alexey Tikhonov <atikhono@redhat.com> - 2.10.2-3.2
 - Resolves: RHEL-79158 - Disk cache failure with large db sizes
