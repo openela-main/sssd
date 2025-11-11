@@ -1,0 +1,39 @@
+commit 9939c39d1949fad48af2f0b43c788bad0809e310
+Author: Sumit Bose <sbose@redhat.com>
+Date:   Fri Oct 10 12:57:40 2025 +0200
+
+    krb5: disable Kerberos localauth an2ln plugin for AD/IPA
+    
+    If a client is joined to AD or IPA SSSD's localauth plugin can handle
+    the mapping of Kerberos principals to local accounts. In case it cannot
+    map the Kerberos principals libkrb5 is currently configured to fall back
+    to the default localauth plugins 'default', 'rule', 'names',
+    'auth_to_local', 'k5login' and 'an2ln' (see man krb5.conf for details).
+    All plugins except 'an2ln' require some explicit configuration by either
+    the administrator or the local user. To avoid some unexpected mapping is
+    done by the 'an2ln' plugin this patch disables it in the configuration
+    snippets for SSSD's localauth plugin.
+    
+    Resolves: https://github.com/SSSD/sssd/issues/8021
+    
+    :relnote: After startup SSSD already creates a Kerberos configuration
+     snippet typically in /var/lib/sss/pubconf/krb5.include.d/localauth_plugin
+     if the AD or IPA providers are used. This enables SSSD's localauth plugin.
+     Starting with this release the an2ln plugin is disabled in the
+     configuration snippet as well. If this file or its content are included in
+     the Kerberos configuration it will fix CVE-2025-11561.
+    
+    Reviewed-by: Alexey Tikhonov <atikhono@redhat.com>
+    Reviewed-by: Pavel Březina <pbrezina@redhat.com>
+
+diff -up sssd-2.9.7/src/util/domain_info_utils.c.orig sssd-2.9.7/src/util/domain_info_utils.c
+--- sssd-2.9.7/src/util/domain_info_utils.c.orig	2025-05-20 16:51:32.000000000 +0200
++++ sssd-2.9.7/src/util/domain_info_utils.c	2025-10-20 10:55:54.008139333 +0200
+@@ -751,6 +751,7 @@ done:
+ #define LOCALAUTH_PLUGIN_CONFIG \
+ "[plugins]\n" \
+ " localauth = {\n" \
++"  disable = an2ln\n" \
+ "  module = sssd:"APP_MODULES_PATH"/sssd_krb5_localauth_plugin.so\n" \
+ " }\n"
+ 

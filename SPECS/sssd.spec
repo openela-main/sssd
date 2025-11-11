@@ -27,7 +27,7 @@
 
 Name: sssd
 Version: 2.9.7
-Release: 4%{?dist}
+Release: 4%{?dist}.1
 Summary: System Security Services Daemon
 License: GPLv3+
 URL: https://github.com/SSSD/sssd/
@@ -36,6 +36,7 @@ Source0: https://github.com/SSSD/sssd/releases/download/%{version}/sssd-%{versio
 ### Patches ###
 Patch0001: 0001-authtok-add-IS_PW_OR_ST_AUTHTOK.patch
 Patch0002: 0002-krb5-offline-with-SSS_AUTHTOK_TYPE_PAM_STACKED.patch
+Patch0003: 0003-disable-Kerberos-localauth-an2ln-plugin-for-AD-IPA.patch
 
 ### Dependencies ###
 
@@ -1085,6 +1086,10 @@ fi
 %systemd_postun_with_restart sssd.service
 
 %changelog
+* Fri Oct 17 2025 Tomas Halman <thalman@redhat.com - 2.9.7.4.1
+- Resolves: RHEL-120298 - CVE-2025-11561 sssd: SSSD default Kerberos configuration allows privilege escalation
+  on AD-joined Linux systems
+
 * Thu Aug 14 2025 Alexey Tikhonov <atikhono@redhat.com> - 2.9.7-4
 - Related: RHEL-87530 - AD user in external group is not cleared when expiring the cache [rhel-9]
   Patch used to fix this ticket causes a regression (RHEL-106987) and is being reverted.
