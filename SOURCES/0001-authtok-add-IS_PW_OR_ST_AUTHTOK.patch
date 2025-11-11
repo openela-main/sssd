@@ -1,0 +1,42 @@
+From be42436c2070e1dc9b2e5d3e03700624f4cc20bf Mon Sep 17 00:00:00 2001
+From: Sumit Bose <sbose@redhat.com>
+Date: Wed, 18 Jun 2025 14:30:57 +0200
+Subject: [PATCH 3/4] authtok: add IS_PW_OR_ST_AUTHTOK()
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+This patch adds a helper macro to determine if an authtok struct is of
+type SSS_AUTHTOK_TYPE_PASSWORD or SSS_AUTHTOK_TYPE_PAM_STACKED. This is
+useful if a password is expected but an authentication token forwarded
+by an different PAM module, which is most probably a password, can be
+used as well.
+
+Resolves: https://github.com/SSSD/sssd/issues/7968
+
+Reviewed-by: Pavel Březina <pbrezina@redhat.com>
+Reviewed-by: Shridhar Gadekar <sgadekar@redhat.com>
+Reviewed-by: Tomáš Halman <thalman@redhat.com>
+(cherry picked from commit 297ecc467efb6035e370f62e62ffa668bb1d0050)
+---
+ src/util/authtok.h | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/src/util/authtok.h b/src/util/authtok.h
+index b58e9dbbd..acabb7078 100644
+--- a/src/util/authtok.h
++++ b/src/util/authtok.h
+@@ -28,6 +28,10 @@
+     sss_authtok_get_type((tok)) == SSS_AUTHTOK_TYPE_SC_PIN \
+         || sss_authtok_get_type((tok)) == SSS_AUTHTOK_TYPE_SC_KEYPAD)
+ 
++#define IS_PW_OR_ST_AUTHTOK(tok) ( \
++    sss_authtok_get_type((tok)) == SSS_AUTHTOK_TYPE_PASSWORD \
++        || sss_authtok_get_type((tok)) == SSS_AUTHTOK_TYPE_PAM_STACKED)
++
+ 
+ /* Use sss_authtok_* accessor functions instead of struct sss_auth_token
+  */
+-- 
+2.50.0
+

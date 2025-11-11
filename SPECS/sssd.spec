@@ -26,18 +26,16 @@
 %global samba_package_version %(rpm -q samba-devel --queryformat %{version})
 
 Name: sssd
-Version: 2.9.6
-Release: 4%{?dist}.2
+Version: 2.9.7
+Release: 4%{?dist}
 Summary: System Security Services Daemon
 License: GPLv3+
 URL: https://github.com/SSSD/sssd/
 Source0: https://github.com/SSSD/sssd/releases/download/%{version}/sssd-%{version}.tar.gz
 
 ### Patches ###
-Patch0001: 0001-SYSDB-Use-SYSDB_NAME-from-cached-entry-when-updating.patch
-Patch0002: 0002-KCM-fix-memory-leak.patch
-Patch0003: 0003-KCM-another-memory-leak-fixed.patch
-Patch0004: 0004-SYSDB-don-t-add-group-members-if-ignore_group_member.patch
+Patch0001: 0001-authtok-add-IS_PW_OR_ST_AUTHTOK.patch
+Patch0002: 0002-krb5-offline-with-SSS_AUTHTOK_TYPE_PAM_STACKED.patch
 
 ### Dependencies ###
 
@@ -1087,6 +1085,24 @@ fi
 %systemd_postun_with_restart sssd.service
 
 %changelog
+* Thu Aug 14 2025 Alexey Tikhonov <atikhono@redhat.com> - 2.9.7-4
+- Related: RHEL-87530 - AD user in external group is not cleared when expiring the cache [rhel-9]
+  Patch used to fix this ticket causes a regression (RHEL-106987) and is being reverted.
+
+* Mon Jul 14 2025 Alexey Tikhonov <atikhono@redhat.com> - 2.9.7-3
+- Resolves: RHEL-87530 - AD user in external group is not cleared when expiring the cache [rhel-9]
+- Resolves: RHEL-103434 - cache_credentials = true not working
+
+* Wed Jun 11 2025 Alexey Tikhonov <atikhono@redhat.com> - 2.9.7-2
+- Related: RHEL-89873 - Rebase Samba to the latest 4.22.x release
+
+* Tue May 20 2025 Alexey Tikhonov <atikhono@redhat.com> - 2.9.7-1
+- Resolves: RHEL-92622 - Rebase SSSD for RHEL 9.7
+- Resolves: RHEL-87205 - SSSD fails to connect with ipv4_first when on a machine with only IPv6 and server is dual-stack [rhel-9]
+- Resolves: RHEL-73906 - OAuth2 using UPN attribute from Entra ID
+- Resolves: RHEL-92590 - SSSD LDAPU1 Mapping braces problem [rhel-9]
+- Resolves: RHEL-90136 - backport https://github.com/SSSD/sssd/pull/7649
+
 * Mon Apr  7 2025 Alexey Tikhonov <atikhono@redhat.com> - 2.9.6-4.2
 - Resolves: RHEL-82419 - Disk cache failure with large db sizes [rhel-9]
 
