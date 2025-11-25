@@ -23,7 +23,7 @@
 
 Name: sssd
 Version: 2.11.1
-Release: 2%{?dist}
+Release: 2%{?dist}.1
 Summary: System Security Services Daemon
 License: GPL-3.0-or-later
 URL: https://github.com/SSSD/sssd/
@@ -32,6 +32,7 @@ Source1: sssd.sysusers
 
 ### Patches ###
 Patch0001: 0001-Revert-ipa-improve-handling-of-external-group-member.patch
+Patch0002: 0002-krb5-disable-Kerberos-localauth-an2ln-plugin-for-AD-.patch
 
 ### Dependencies ###
 
@@ -1092,6 +1093,10 @@ fi
 %systemd_postun_with_restart sssd.service
 
 %changelog
+* Tue Oct 21 2025 Sumit Bose <sbose@redhat.com> - 2.11.1-2.1
+- Resovles: RHEL-120288 - CVE-2025-11561 sssd: SSSD default Kerberos configuration allows
+  privilege escalation on AD-joined Linux systems [rhel-10.1.z]
+
 * Thu Aug 14 2025 Alexey Tikhonov <atikhono@redhat.com> - 2.11.1-2
 - Related: RHEL-77184 - AD user in external group is not cleared when expiring the cache
   Patch used to fix this ticket causes a regression (RHEL-106987) and is being reverted.
