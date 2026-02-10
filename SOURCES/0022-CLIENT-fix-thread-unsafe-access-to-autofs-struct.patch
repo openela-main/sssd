@@ -1,0 +1,40 @@
+From ad345be38aaff0caf2fa88a45c8ff69f90b92038 Mon Sep 17 00:00:00 2001
+From: Alexey Tikhonov <atikhono@redhat.com>
+Date: Wed, 8 Oct 2025 18:23:50 +0200
+Subject: [PATCH] CLIENT: fix thread unsafe access to autofs struct.
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+In case SSSD is built with lock-free client support, `sss_nss_lock()`
+is a no-op, thus resulting in thread unsafe access.
+
+This is a fix similar to 69fd828c1d5e92bc3b2e327a45dfed116f49d50a
+
+Reviewed-by: Pavel Březina <pbrezina@redhat.com>
+Reviewed-by: Sumit Bose <sbose@redhat.com>
+(cherry picked from commit f3af8c89af656767333410b0e94da9288dd8ade8)
+---
+ src/sss_client/autofs/sss_autofs.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/src/sss_client/autofs/sss_autofs.c b/src/sss_client/autofs/sss_autofs.c
+index ef27cf895..f5986767f 100644
+--- a/src/sss_client/autofs/sss_autofs.c
++++ b/src/sss_client/autofs/sss_autofs.c
+@@ -65,7 +65,11 @@ struct automtent {
+     size_t cursor;
+ };
+ 
+-static struct sss_getautomntent_data {
++static
++#ifdef HAVE_PTHREAD_EXT
++__thread
++#endif
++struct sss_getautomntent_data {
+     char *mapname;
+     size_t len;
+     size_t ptr;
+-- 
+2.52.0
+

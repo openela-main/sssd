@@ -19,7 +19,7 @@
 
 Name: sssd
 Version: 2.9.4
-Release: 5%{?dist}.3
+Release: 5%{?dist}.4
 Group: Applications/System
 Summary: System Security Services Daemon
 License: GPLv3+
@@ -48,6 +48,11 @@ Patch0018: 0018-SYSDB-don-t-add-group-members-if-ignore_group_member.patch
 Patch0019: 0019-SYSDB-Use-SYSDB_NAME-from-cached-entry-when-updating.patch
 Patch0020: 0020-p11_child-Add-timeout-parameter.patch
 Patch0021: 0021-krb5-disable-Kerberos-localauth-an2ln-plugin-for-AD-.patch
+Patch0022: 0022-CLIENT-fix-thread-unsafe-access-to-autofs-struct.patch
+Patch0023: 0023-sbus-defer-notification-callbacks.patch
+Patch0024: 0024-cache_req-allow-cache_first-mode-only-if-there-is-mo.patch
+Patch0025: 0025-RESPONDER-use-proper-context-for-getDomains.patch
+Patch0026: 0026-Enumerate-object-with-escaped-characters-in-name.patch
 
 ### Downstream Patches ###
 
@@ -1232,6 +1237,12 @@ fi
 %systemd_postun_with_restart sssd.service
 
 %changelog
+* Mon Jan 26 2026 Alexey Tikhonov <atikhono@redhat.com> - 2.9.4-5.4
+- Resolves: RHEL-143731 - Crash in 'sss_client/autofs/sss_autofs.c' [rhel-8.10.z]
+- Resolves: RHEL-133476 - 'sssd_nss' hangs when looking up an object by ID that has expired cache entry and filtered out by name [rhel-8.10.z]
+- Resolves: RHEL-114350 - Frequent crashes of the SSSD process (sssd_pac), leading to the termination of the AD trusted domain subprocess by the watchdog [rhel-8.10.z]
+- Resolves: RHEL-143719 - SSSD unable to enumerate LDAP groups with 'getent group' & 'getent group -s sss ' if LDAP server contains any group with # character in their names [rhel-8.10.z]
+
 * Fri Oct 17 2025 Alejandro López <allopez@redhat.com> - 2.9.4-5.3
 - Resolves: RHEL-112455 - p11_child currently has an infinite timeout [rhel-8.10.z]
 - Resolves: RHEL-120292 - CVE-2025-11561 sssd: SSSD default Kerberos configuration allows privilege escalation on AD-joined Linux systems [rhel-8.10.z]	

@@ -1,0 +1,57 @@
+From 86d8d0d1f6653e8d5d8f4d1988a84256a1f429d9 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Pavel=20B=C5=99ezina?= <pbrezina@redhat.com>
+Date: Fri, 14 Nov 2025 14:29:43 +0100
+Subject: [PATCH 23/24] sbus: defer notification callbacks
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Otherwise, it is possible to incorrectly chain nested requests since the
+chain id is still present in the hash table.
+
+Resolves: https://github.com/SSSD/sssd/issues/8194
+Reviewed-by: Alexey Tikhonov <atikhono@redhat.com>
+Reviewed-by: Tomáš Halman <thalman@redhat.com>
+(cherry picked from commit d6ea55552ec1eeda4a58336bba4a2873b0568b65)
+---
+ src/sbus/request/sbus_request_hash.c | 4 ++++
+ src/sbus/sbus_private.h              | 1 +
+ 2 files changed, 5 insertions(+)
+
+diff --git a/src/sbus/request/sbus_request_hash.c b/src/sbus/request/sbus_request_hash.c
+index 0ddad03a8..28d5df81e 100644
+--- a/src/sbus/request/sbus_request_hash.c
++++ b/src/sbus/request/sbus_request_hash.c
+@@ -147,6 +147,7 @@ sbus_requests_add(hash_table_t *table,
+         goto done;
+     }
+ 
++    item->ev = conn->ev;
+     item->req = req;
+     item->conn = conn;
+     item->is_dbus = is_dbus;
+@@ -283,6 +284,9 @@ sbus_requests_finish(struct sbus_request_list *item,
+         return;
+     }
+ 
++    /* Defer callback so all requests are notified before callbacks are run. */
++    tevent_req_defer_callback(item->req, item->ev);
++
+     if (error != EOK) {
+         tevent_req_error(item->req, error);
+         return;
+diff --git a/src/sbus/sbus_private.h b/src/sbus/sbus_private.h
+index eef397b86..d65a29e21 100644
+--- a/src/sbus/sbus_private.h
++++ b/src/sbus/sbus_private.h
+@@ -430,6 +430,7 @@ sbus_server_filter(DBusConnection *dbus_conn,
+ struct sbus_request_spy;
+ 
+ struct sbus_request_list {
++    struct tevent_context *ev;
+     struct tevent_req *req;
+     struct sbus_connection *conn;
+ 
+-- 
+2.52.0
+

@@ -1,0 +1,38 @@
+From a475fbe31d66427c3fd3d4211bb2d2f639013b0f Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Pavel=20B=C5=99ezina?= <pbrezina@redhat.com>
+Date: Fri, 14 Nov 2025 15:03:52 +0100
+Subject: [PATCH 24/24] cache_req: allow cache_first mode only if there is more
+ than one domain
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Otherwise we will perform unnecessary data provider lookups.
+
+Resolves: https://github.com/SSSD/sssd/issues/8194
+Reviewed-by: Alexey Tikhonov <atikhono@redhat.com>
+Reviewed-by: Tomáš Halman <thalman@redhat.com>
+(cherry picked from commit 816eb1e202b774ebec5463ad1dcb85d41ea11c8a)
+---
+ src/responder/common/cache_req/cache_req.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/src/responder/common/cache_req/cache_req.c b/src/responder/common/cache_req/cache_req.c
+index b82759532..1d0fa824c 100644
+--- a/src/responder/common/cache_req/cache_req.c
++++ b/src/responder/common/cache_req/cache_req.c
+@@ -163,7 +163,10 @@ cache_req_create(TALLOC_CTX *mem_ctx,
+         talloc_free(cr);
+         return NULL;
+     }
+-    if (rctx->cache_first) {
++
++    /* Allow cache first only if there is more than one domain. */
++    if (rctx->cache_first
++        && (rctx->domains->next != NULL || rctx->domains->subdomains != NULL)) {
+         cr->cache_behavior = CACHE_REQ_CACHE_FIRST;
+     }
+     /* it is ok to override cache_first here */
+-- 
+2.52.0
+

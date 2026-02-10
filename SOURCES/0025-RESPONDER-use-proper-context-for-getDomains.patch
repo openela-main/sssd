@@ -1,0 +1,56 @@
+From b1a0eda4bff3faacea7203ac9839bdbe275c344a Mon Sep 17 00:00:00 2001
+From: Alexey Tikhonov <atikhono@redhat.com>
+Date: Fri, 26 Apr 2024 14:04:50 +0200
+Subject: [PATCH] RESPONDER: use proper context for getDomains()
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Request was created on a long term responder context, but a callback
+for this request tries to access memory that is allocated on a short
+term client context. So if client disconnects before request is
+completed, then callback dereferences already freed memory.
+
+Resolves: https://github.com/SSSD/sssd/issues/7319
+
+Reviewed-by: Alejandro López <allopez@redhat.com>
+Reviewed-by: Pavel Březina <pbrezina@redhat.com>
+(cherry picked from commit dc637c9730d0ba04a0d8aa2645ee537224cd4b19)
+(cherry picked from commit b0fda92e7e3c5bbcf30d8945411947e3fc6ae84b)
+
+Reviewed-by: Alejandro López <allopez@redhat.com>
+Reviewed-by: Sumit Bose <sbose@redhat.com>
+---
+ src/responder/pac/pacsrv_cmd.c | 2 +-
+ src/responder/pam/pamsrv_cmd.c | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/responder/pac/pacsrv_cmd.c b/src/responder/pac/pacsrv_cmd.c
+index abfc2c991..d0663d73b 100644
+--- a/src/responder/pac/pacsrv_cmd.c
++++ b/src/responder/pac/pacsrv_cmd.c
+@@ -146,7 +146,7 @@ static errno_t pac_add_pac_user(struct cli_ctx *cctx)
+     ret = responder_get_domain_by_id(cctx->rctx, pr_ctx->user_dom_sid_str,
+                                      &pr_ctx->dom);
+     if (ret == EAGAIN || ret == ENOENT) {
+-        req = sss_dp_get_domains_send(cctx->rctx, cctx->rctx, true,
++        req = sss_dp_get_domains_send(cctx, cctx->rctx, true,
+                                       pr_ctx->domain_name);
+         if (req == NULL) {
+             ret = ENOMEM;
+diff --git a/src/responder/pam/pamsrv_cmd.c b/src/responder/pam/pamsrv_cmd.c
+index a7c181733..b6d2905dd 100644
+--- a/src/responder/pam/pamsrv_cmd.c
++++ b/src/responder/pam/pamsrv_cmd.c
+@@ -1918,7 +1918,7 @@ static int pam_forwarder(struct cli_ctx *cctx, int pam_cmd)
+ 
+     ret = pam_forwarder_parse_data(cctx, pd);
+     if (ret == EAGAIN) {
+-        req = sss_dp_get_domains_send(cctx->rctx, cctx->rctx, true, pd->domain);
++        req = sss_dp_get_domains_send(cctx, cctx->rctx, true, pd->domain);
+         if (req == NULL) {
+             ret = ENOMEM;
+         } else {
+-- 
+2.52.0
+
