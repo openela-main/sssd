@@ -27,13 +27,16 @@
 
 Name: sssd
 Version: 2.9.8
-Release: 1%{?dist}
+Release: 4%{?dist}
 Summary: System Security Services Daemon
 License: GPLv3+
 URL: https://github.com/SSSD/sssd/
 Source0: https://github.com/SSSD/sssd/releases/download/%{version}/sssd-%{version}.tar.gz
 
 ### Patches ###
+Patch1: 0001-do-not-require-GID-for-non-POSIX-group.patch
+Patch2: 0002-fix-use-after-free-in-kcm_read_options.patch
+Patch3: 0003-add-missing-include.patch
 
 ### Dependencies ###
 
@@ -1083,6 +1086,15 @@ fi
 %systemd_postun_with_restart sssd.service
 
 %changelog
+* Wed Apr 15 2026 Tomas Halman <thalman@redhat.com> - 2.9.8-4
+- Resolves: RHEL-154804 Crash in 'sss_client/autofs/sss_autofs.c'
+
+* Mon Apr 13 2026 Tomas Halman <thalman@redhat.com> - 2.9.8-3
+- Resolves: RHEL-167758 - sssd-kcm fails to start if krb5_renew_interval is specified
+
+* Thu Apr 2 2026 Tomas Halman <thalman@redhat.com> - 2.9.8-2
+- Resolves: RHEL-150277 - Failed to resolve indirect group-members of nested non-POSIX group
+
 * Thu Jan 22 2026 Tomas Halman <thalman@redhat.com> - 2.9.8-1
 - Resolves: RHEL-143692 - SSSD Rebase for RHEL 9.8
 - Resolves: RHEL-133967 - Remove SSSD option ipa_enable_dns_sites
