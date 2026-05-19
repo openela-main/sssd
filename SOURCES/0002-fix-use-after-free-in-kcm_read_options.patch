@@ -1,0 +1,16 @@
+KCM: fix use-after-free in `kcm_read_options()`
+Based on commit c5a2b48f13af893ae6c7c9fe63e41f64eb77cade
+
+diff --git a/src/responder/kcm/kcm_renew.c b/src/responder/kcm/kcm_renew.c
+index 39e9470fa22..32eccf4b48a 100644
+--- a/src/responder/kcm/kcm_renew.c
++++ b/src/responder/kcm/kcm_renew.c
+@@ -228,7 +228,7 @@ static errno_t kcm_read_options(TALLOC_CTX *mem_ctx,
+     *_validate = validate;
+     *_canonicalize = canonicalize;
+     *_timeout = timeout;
+-    *_renew_intv = renew_intv;
++    *_renew_intv = talloc_steal(mem_ctx, renew_intv);
+ 
+     ret = EOK;
+ 

@@ -1,0 +1,385 @@
+Based on https://github.com/SSSD/sssd/pull/8595
+idp: do not update cache timeout if member is added
+
+diff -up sssd-2.12.0/src/confdb/confdb.c.orig sssd-2.12.0/src/confdb/confdb.c
+--- sssd-2.12.0/src/confdb/confdb.c.orig	2026-01-14 15:59:45.496996946 +0100
++++ sssd-2.12.0/src/confdb/confdb.c	2026-04-14 11:31:11.752143448 +0200
+@@ -1091,6 +1091,7 @@ static errno_t confdb_init_domain(struct
+ {
+     errno_t ret;
+     const char *tmp;
++    bool default_avoid_by_id_lookups = false;
+ 
+     tmp = ldb_msg_find_attr_as_string(res->msgs[0], "cn", NULL);
+     if (!tmp) {
+@@ -1214,6 +1215,19 @@ static errno_t confdb_init_domain(struct
+         }
+     }
+ 
++    if (strcasecmp(domain->provider, "idp") == 0) {
++        default_avoid_by_id_lookups = true;
++    }
++    ret = get_entry_as_bool(res->msgs[0], &domain->avoid_by_id_lookups,
++                            CONFDB_DOMAIN_AVOID_BY_ID_LOOKUPS,
++                            default_avoid_by_id_lookups);
++    if (ret != EOK) {
++        DEBUG(SSSDBG_FATAL_FAILURE,
++              "Invalid value for %s\n",
++               CONFDB_DOMAIN_AVOID_BY_ID_LOOKUPS);
++        goto done;
++    }
++
+     domain->has_views = false;
+     domain->view_name = NULL;
+ 
+diff -up sssd-2.12.0/src/confdb/confdb.h.orig sssd-2.12.0/src/confdb/confdb.h
+--- sssd-2.12.0/src/confdb/confdb.h.orig	2026-01-14 15:59:45.496996946 +0100
++++ sssd-2.12.0/src/confdb/confdb.h	2026-04-14 11:31:11.752647894 +0200
+@@ -226,6 +226,7 @@
+ #define CONFDB_DOMAIN_ACCOUNT_CACHE_EXPIRATION "account_cache_expiration"
+ #define CONFDB_DOMAIN_OVERRIDE_GID "override_gid"
+ #define CONFDB_DOMAIN_CASE_SENSITIVE "case_sensitive"
++#define CONFDB_DOMAIN_AVOID_BY_ID_LOOKUPS "avoid_by_id_lookups"
+ #define CONFDB_DOMAIN_SUBDOMAIN_HOMEDIR "subdomain_homedir"
+ #define CONFDB_DOMAIN_DEFAULT_SUBDOMAIN_HOMEDIR "/home/%d/%u"
+ #define CONFDB_DOMAIN_IGNORE_GROUP_MEMBERS "ignore_group_members"
+@@ -366,6 +367,7 @@ struct sss_domain_info {
+     uint32_t cache_credentials_min_ff_length;
+     bool case_sensitive;
+     bool case_preserve;
++    bool avoid_by_id_lookups;
+ 
+     gid_t override_gid;
+     const char *override_homedir;
+diff -up sssd-2.12.0/src/config/cfg_rules.ini.orig sssd-2.12.0/src/config/cfg_rules.ini
+--- sssd-2.12.0/src/config/cfg_rules.ini.orig	2026-01-14 15:59:45.496996946 +0100
++++ sssd-2.12.0/src/config/cfg_rules.ini	2026-04-14 11:31:11.753537516 +0200
+@@ -393,6 +393,7 @@ option = dns_discovery_domain
+ option = failover_primary_timeout
+ option = override_gid
+ option = case_sensitive
++option = avoid_by_id_lookups
+ option = override_homedir
+ option = fallback_homedir
+ option = homedir_substring
+diff -up sssd-2.12.0/src/config/etc/sssd.api.conf.orig sssd-2.12.0/src/config/etc/sssd.api.conf
+--- sssd-2.12.0/src/config/etc/sssd.api.conf.orig	2026-01-14 15:59:45.497996946 +0100
++++ sssd-2.12.0/src/config/etc/sssd.api.conf	2026-04-14 11:31:11.753715790 +0200
+@@ -172,6 +172,7 @@ dns_discovery_domain = str, None, false
+ failover_primary_timeout = int, None, false
+ override_gid = int, None, false
+ case_sensitive = str, None, false
++avoid_by_id_lookups = bool, None, false
+ override_homedir = str, None, false
+ fallback_homedir = str, None, false
+ homedir_substring = str, None, false
+diff -up sssd-2.12.0/src/config/SSSDConfig/sssdoptions.py.orig sssd-2.12.0/src/config/SSSDConfig/sssdoptions.py
+--- sssd-2.12.0/src/config/SSSDConfig/sssdoptions.py.orig	2026-01-14 15:59:45.496996946 +0100
++++ sssd-2.12.0/src/config/SSSDConfig/sssdoptions.py	2026-04-14 11:31:11.752888576 +0200
+@@ -187,6 +187,7 @@ class SSSDOptions(object):
+                                       'server after a successful connection to the backup server'),
+         'override_gid': _('Override GID value from the identity provider with this value'),
+         'case_sensitive': _('Treat usernames as case sensitive'),
++        'avoid_by_id_lookups': _('Lookups by ID are expensive or do not work at all'),
+         'entry_cache_user_timeout': _('Entry cache timeout length (seconds)'),
+         'entry_cache_group_timeout': _('Entry cache timeout length (seconds)'),
+         'entry_cache_netgroup_timeout': _('Entry cache timeout length (seconds)'),
+diff -up sssd-2.12.0/src/config/SSSDConfigTest.py.orig sssd-2.12.0/src/config/SSSDConfigTest.py
+--- sssd-2.12.0/src/config/SSSDConfigTest.py.orig	2026-01-14 15:59:45.496996946 +0100
++++ sssd-2.12.0/src/config/SSSDConfigTest.py	2026-04-14 11:31:11.753215468 +0200
+@@ -573,6 +573,7 @@ class SSSDConfigTestSSSDDomain(unittest.
+             'dyndns_dot_key',
+             'override_gid',
+             'case_sensitive',
++            'avoid_by_id_lookups',
+             'override_homedir',
+             'fallback_homedir',
+             'homedir_substring',
+@@ -937,6 +938,7 @@ class SSSDConfigTestSSSDDomain(unittest.
+             'dyndns_dot_key',
+             'override_gid',
+             'case_sensitive',
++            'avoid_by_id_lookups',
+             'override_homedir',
+             'fallback_homedir',
+             'homedir_substring',
+diff -up sssd-2.12.0/src/db/sysdb_subdomains.c.orig sssd-2.12.0/src/db/sysdb_subdomains.c
+--- sssd-2.12.0/src/db/sysdb_subdomains.c.orig	2026-01-14 15:59:45.499996945 +0100
++++ sssd-2.12.0/src/db/sysdb_subdomains.c	2026-04-14 11:31:11.753963557 +0200
+@@ -199,6 +199,7 @@ struct sss_domain_info *new_subdomain(TA
+     dom->default_shell = parent->default_shell;
+     dom->homedir_substr = parent->homedir_substr;
+     dom->override_gid = parent->override_gid;
++    dom->avoid_by_id_lookups = parent->avoid_by_id_lookups;
+ 
+     dom->gssapi_services = parent->gssapi_services;
+     dom->gssapi_indicators_map = parent->gssapi_indicators_map;
+diff -up sssd-2.12.0/src/man/sssd.conf.5.xml.orig sssd-2.12.0/src/man/sssd.conf.5.xml
+--- sssd-2.12.0/src/man/sssd.conf.5.xml.orig	2026-01-14 15:59:45.543996926 +0100
++++ sssd-2.12.0/src/man/sssd.conf.5.xml	2026-04-14 11:31:11.754747046 +0200
+@@ -3775,6 +3775,28 @@ pam_json_services = gdm-switchable-auth
+                 </varlistentry>
+ 
+                 <varlistentry>
++                    <term>avoid_by_id_lookups (boolean)</term>
++                    <listitem>
++                        <para>
++                            If this option is set to 'true' SSSD will try to
++                            avoid sending lookups by ID to the backend and
++                            will switch to a lookup by name if a cached
++                            object with a matching ID can be found.
++                        </para>
++                        <para>
++                            This option can e.g. be used in cases where
++                            searches by ID are expensive on the server side
++                            because of missing indexes or are not even
++                            possible, e.g. due to non-reversible POSIX
++                            id-mapping.
++                        </para>
++                        <para>
++                            Default: False (True for IdP provider)
++                        </para>
++                    </listitem>
++                </varlistentry>
++
++                <varlistentry>
+                     <term>subdomain_inherit (string)</term>
+                     <listitem>
+                         <para>
+diff -up sssd-2.12.0/src/providers/idp/idp_id_eval.c.orig sssd-2.12.0/src/providers/idp/idp_id_eval.c
+--- sssd-2.12.0/src/providers/idp/idp_id_eval.c.orig	2026-01-14 15:59:45.551996922 +0100
++++ sssd-2.12.0/src/providers/idp/idp_id_eval.c	2026-04-14 11:31:11.756401469 +0200
+@@ -137,7 +137,6 @@ static errno_t store_json_group(struct i
+     errno_t ret;
+     json_t *group_name = NULL;
+     json_t *uuid = NULL;
+-    int cache_timeout;
+     struct sss_domain_info *dom;
+     gid_t gid;
+     char *fqdn = NULL;
+@@ -195,18 +194,35 @@ static errno_t store_json_group(struct i
+         goto done;
+     }
+ 
+-    cache_timeout = dom->group_timeout;
+-    ret = sysdb_store_group(dom, fqdn, gid, attrs, cache_timeout, 0);
++    /* If we just add a single member to a group (user_name != NULL) we do not
++     * want to change the cache timeout. Calling `sysdb_add_incomplete_group()
++     * will check if the group already exists (ret == ERR_GID_DUPLICATED) or
++     * create an expired group object (ret == EOK). In both cases there will
++     * be a cached group object where the user can be added as a member. */
++    if (user_name == NULL) {
++        ret = sysdb_store_group(dom, fqdn, gid, attrs, dom->group_timeout, 0);
++        if (ret != EOK) {
++            DEBUG(SSSDBG_OP_FAILURE, "Failed to store group [%s].\n", fqdn);
++            goto done;
++        }
++    } else {
++        ret = sysdb_add_incomplete_group(dom, fqdn, gid, NULL, NULL,
++                                         json_string_value(uuid),
++                                         gid != 0, 0);
++        if (ret != EOK && ret != ERR_GID_DUPLICATED) {
++            DEBUG(SSSDBG_OP_FAILURE,
++                  "Failed to create incomplete group [%s].\n", fqdn);
++            goto done;
++        }
+ 
+-    if (user_name != NULL) {
+         ret = sysdb_add_group_member(dom, fqdn, user_name, SYSDB_MEMBER_USER,
+                                      false);
+-            if (ret != EOK) {
+-                DEBUG(SSSDBG_OP_FAILURE,
+-                      "Failed to store user [%s] as member of group [%s].\n",
+-                      user_name, fqdn);
+-                goto done;
+-            }
++        if (ret != EOK) {
++            DEBUG(SSSDBG_OP_FAILURE,
++                  "Failed to store user [%s] as member of group [%s].\n",
++                  user_name, fqdn);
++            goto done;
++        }
+     }
+ 
+ done:
+diff -up sssd-2.12.0/src/responder/common/cache_req/cache_req.c.orig sssd-2.12.0/src/responder/common/cache_req/cache_req.c
+--- sssd-2.12.0/src/responder/common/cache_req/cache_req.c.orig	2026-01-14 15:59:45.565996916 +0100
++++ sssd-2.12.0/src/responder/common/cache_req/cache_req.c	2026-04-14 11:31:11.755687660 +0200
+@@ -23,6 +23,7 @@
+ #include <tevent.h>
+ #include <errno.h>
+ 
++#include "db/sysdb.h"
+ #include "util/util.h"
+ #include "util/sss_chain_id.h"
+ #include "responder/common/responder.h"
+@@ -1613,3 +1614,56 @@ cache_req_steal_data_and_send(TALLOC_CTX
+ 
+     return req;
+ }
++
++errno_t cache_req_fallback_to_name_search(struct cache_req *cr,
++                                          enum cache_req_type fallback_type,
++                                          struct ldb_result *result)
++{
++    int ret;
++    const char *name = NULL;
++    char *shortname = NULL;
++
++    name = ldb_msg_find_attr_as_string(result->msgs[0], SYSDB_NAME, NULL);
++    if (name != NULL) {
++        ret = cache_req_set_plugin(cr, fallback_type);
++        if (ret != EOK) {
++            CACHE_REQ_DEBUG(SSSDBG_OP_FAILURE, cr, "cache_req_set_plugin failed.\n");
++            goto done;
++        }
++
++        ret = sss_parse_internal_fqname(cr, name, &shortname, NULL);
++        if (ret != EOK) {
++            CACHE_REQ_DEBUG(SSSDBG_CRIT_FAILURE, cr, "sss_parse_internal_fqname() failed\n");
++            goto done;
++        }
++
++        ret = cache_req_set_name(cr, shortname);
++        if (ret != EOK) {
++            CACHE_REQ_DEBUG(SSSDBG_CRIT_FAILURE, cr, "cache_req_set_name() failed\n");
++            goto done;
++        }
++
++        ret = cr->plugin->prepare_domain_data_fn(cr, cr->data, cr->domain);
++        if (ret != EOK) {
++            CACHE_REQ_DEBUG(SSSDBG_OP_FAILURE, cr, "prepare_domain_data_fn() failed.\n");
++            goto done;
++        }
++
++        ret = cache_req_create_debug_name(cr, cr->domain);
++        if (ret != EOK) {
++            CACHE_REQ_DEBUG(SSSDBG_OP_FAILURE, cr, "cache_req_create_debug_name() failed.\n");
++            goto done;
++        }
++
++        CACHE_REQ_DEBUG(SSSDBG_TRACE_FUNC, cr, "Switching to name [%s]\n",
++                        name);
++    } else {
++        CACHE_REQ_DEBUG(SSSDBG_OP_FAILURE, cr, "Name not available, switching not possible.\n");
++    }
++
++    ret = EOK;
++
++done:
++
++    return ret;
++}
+diff -up sssd-2.12.0/src/responder/common/cache_req/cache_req_private.h.orig sssd-2.12.0/src/responder/common/cache_req/cache_req_private.h
+--- sssd-2.12.0/src/responder/common/cache_req/cache_req_private.h.orig	2026-01-14 15:59:45.565996916 +0100
++++ sssd-2.12.0/src/responder/common/cache_req/cache_req_private.h	2026-04-14 11:31:11.755989311 +0200
+@@ -224,4 +224,8 @@ cache_req_common_get_acct_domain_recv(TA
+ 
+ errno_t cache_req_idminmax_check(struct cache_req_data *data,
+                                  struct sss_domain_info *domain);
++
++errno_t cache_req_fallback_to_name_search(struct cache_req *cr,
++                                          enum cache_req_type fallback_type,
++                                          struct ldb_result *result);
+ #endif /* _CACHE_REQ_PRIVATE_H_ */
+diff -up sssd-2.12.0/src/responder/common/cache_req/cache_req_search.c.orig sssd-2.12.0/src/responder/common/cache_req/cache_req_search.c
+--- sssd-2.12.0/src/responder/common/cache_req/cache_req_search.c.orig	2026-01-14 15:59:45.566996916 +0100
++++ sssd-2.12.0/src/responder/common/cache_req/cache_req_search.c	2026-04-14 11:31:11.756157616 +0200
+@@ -311,6 +311,7 @@ cache_req_search_send(TALLOC_CTX *mem_ct
+     bool bypass_dp = false;
+     bool skip_refresh = false;
+     errno_t ret;
++    enum cache_req_type fallback_type = CACHE_REQ_SENTINEL;
+ 
+     req = tevent_req_create(mem_ctx, &state, struct cache_req_search_state);
+     if (req == NULL) {
+@@ -381,6 +382,26 @@ cache_req_search_send(TALLOC_CTX *mem_ct
+             CACHE_REQ_DEBUG(SSSDBG_TRACE_FUNC, cr,
+                             "Object found, but needs to be refreshed.\n");
+             bypass_dp = false;
++
++            if (cr->domain->avoid_by_id_lookups) {
++                if (cache_req_data_get_type(cr->data)
++                                                == CACHE_REQ_GROUP_BY_ID) {
++                    fallback_type = CACHE_REQ_GROUP_BY_NAME;
++                } else if (cache_req_data_get_type(cr->data)
++                                                == CACHE_REQ_USER_BY_ID) {
++                    fallback_type = CACHE_REQ_USER_BY_NAME;
++                }
++
++                if (fallback_type != CACHE_REQ_SENTINEL) {
++                    ret = cache_req_fallback_to_name_search(cr, fallback_type,
++                                                            state->result);
++                    if (ret != EOK) {
++                        DEBUG(SSSDBG_OP_FAILURE,
++                              "Failed to switch to name search.\n");
++                        goto done;
++                    }
++                }
++            }
+         } else {
+             ret = ENOENT;
+         }
+diff -up sssd-2.12.0/src/tests/tests/system/tests/test_idp.py.orig sssd-2.12.0/src/tests/tests/system/tests/test_idp.py
+--- sssd-2.12.0/src/tests/tests/system/tests/test_idp.py.orig	2026-01-14 15:59:45.611996896 +0100
++++ sssd-2.12.0/src/tests/tests/system/tests/test_idp.py	2026-04-14 11:31:49.961013653 +0200
+@@ -159,3 +159,59 @@ def test_idp__group_ignore_group_members
+     out = client.host.conn.run(f"getent group group1{domain}")
+     assert out.stdout.startswith(f"group1{domain}:*:")
+     assert out.stdout.endswith(":")
++
++
++@pytest.mark.parametrize("use_fully_qualified_names", ["true", "false"])
++@pytest.mark.topology(KnownTopology.Keycloak)
++@pytest.mark.builtwith(client="idp-provider")
++def test_idp__id_before_group(client: Client, keycloak: Keycloak, use_fully_qualified_names: str):
++    """
++    :title: Call id before getent group
++    :setup:
++        1. Create two user
++        2. Create group with both users as members
++    :steps:
++        1. Lookup one user with 'id'
++        2. Lookup group with 'getent group'
++    :expectedresults:
++        1. User is member of added group and the auto-private group
++        2. Both users are members of the group
++    :customerscenario: False
++    """
++
++    user1 = keycloak.user("user1").add(password="Secret123")
++    user2 = keycloak.user("user2").add(password="Secret123")
++    group1 = keycloak.group("group1").add().add_members([user1, user2])
++
++    client.sssd.dom("test")["use_fully_qualified_names"] = use_fully_qualified_names
++
++    domain = f"@{client.sssd.default_domain}" if use_fully_qualified_names == "true" else ""
++
++    client.sssd.start(check_config=False)
++
++    user_out = client.tools.id(user1.name + domain)
++    assert user_out is not None, f"User {user1.name} was not found using getent!"
++    assert (
++        user_out.user.name == user1.name + domain
++    ), f"Username {user_out.user.name} is incorrect, {user1.name}{domain} expected!"
++    assert user_out.memberof(
++        group1.name + domain
++    ), f"User {user_out.user.name} is not a member of group {group1.name}{domain}!"
++    assert user_out.memberof(
++        user1.name + domain
++    ), f"User {user_out.user.name} is not a member of group {user1.name}{domain}!"
++
++    group_out = client.tools.getent.group(f"{group1.name}{domain}")
++    assert group_out is not None, f"Group {group1.name}{domain} was not found using getent!"
++    assert (
++        group_out.name == group1.name + domain
++    ), f"Groupname {group_out.name} is incorrect, {group1.name}{domain} expected!"
++    assert (
++        len(group_out.members) == 2
++    ), f"Group {group_out.name} has unexpected number of members [{len(group_out.members)}]!"
++    assert (
++        user1.name + domain in group_out.members
++    ), f"Member {user1.name}{domain} of group {group_out.name} not found!"
++    assert (
++        user2.name + domain in group_out.members
++    ), f"Member {user2.name}{domain} of group {group_out.name} not found!"

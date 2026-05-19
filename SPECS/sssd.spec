@@ -7,7 +7,6 @@
 %global build_kcm_renewals 1
 %global krb5_version 1.18.2
 %global build_passkey 1
-%global build_idp 0
 %global build_ssh_known_hosts_proxy 0
 
 # we don't want to provide private python extension libs
@@ -17,22 +16,22 @@
 
 # Determine the location of the LDB modules directory
 %global ldb_modulesdir %(pkg-config --variable=modulesdir ldb)
-%global ldb_version 1.2.0
 
 %global samba_package_version %(rpm -q samba-devel --queryformat %{version})
 
 Name: sssd
-Version: 2.11.1
-Release: 2%{?dist}.1
+Version: 2.12.0
+Release: 3%{?dist}
 Summary: System Security Services Daemon
 License: GPL-3.0-or-later
 URL: https://github.com/SSSD/sssd/
-Source0: https://github.com/SSSD/sssd/releases/download/2.11.1/sssd-2.11.1.tar.gz
+Source0: https://github.com/SSSD/sssd/releases/download/2.12.0/sssd-2.12.0.tar.gz
 Source1: sssd.sysusers
 
 ### Patches ###
-Patch0001: 0001-Revert-ipa-improve-handling-of-external-group-member.patch
-Patch0002: 0002-krb5-disable-Kerberos-localauth-an2ln-plugin-for-AD-.patch
+Patch1: 0001-do-not-require-GID-for-non-POSIX-group.patch
+Patch2: 0002-fix-use-after-free-in-kcm_read_options.patch
+Patch3: 0003-do-not-update-cache-timeout-if-member-is-added.patch
 
 ### Dependencies ###
 
@@ -87,7 +86,7 @@ BuildRequires: libdhash-devel >= 0.4.2
 BuildRequires: libfido2-devel
 %endif
 BuildRequires: libini_config-devel >= 1.3
-BuildRequires: libldb-devel >= %{ldb_version}
+BuildRequires: libldb-devel
 BuildRequires: libnfsidmap-devel
 BuildRequires: libnl3-devel
 BuildRequires: libselinux-devel
@@ -163,7 +162,7 @@ Obsoletes: libsss_simpleifp-debuginfo < 2.9.2
 Obsoletes: sssd-polkit-rules < 2.10.0
 # Requires
 # due to ABI changes in 1.1.30/1.2.0
-Requires: libldb >= %{ldb_version}
+Requires: libldb >= %{samba_package_version}
 Requires: libtevent >= 0.11.0
 Requires: sssd-client%{?_isa} = %{version}-%{release}
 Requires: (libsss_sudo = %{version}-%{release} if sudo)
@@ -474,14 +473,17 @@ An implementation of a Kerberos KCM server. Use this package if you want to
 use the KCM: Kerberos credentials cache.
 
 %package idp
-Summary: Kerberos plugins and OIDC helper for external identity providers.
+Summary: The IdP back end of the SSSD, Kerberos plugins and OIDC helper
 License: GPL-3.0-or-later
 Requires: sssd-common = %{version}-%{release}
+Requires: libsss_idmap = %{version}-%{release}
 
 %description idp
-This package provides Kerberos plugins that are required to enable
-authentication against external identity providers. Additionally a helper
-program to handle the OAuth 2.0 Device Authorization Grant is provided.
+Provides the Identity Provider (IdP) back end that the SSSD can utilize to fetch
+identity data from and authenticate against an IdP like Keycloak or Entra ID
+server. Additionally this package provides Kerberos plugins that are required to
+enable authentication against external identity providers, if the KDC supports
+it, and a helper program to handle the OAuth 2.0 Device Authorization Grant.
 
 %if %{build_passkey}
 %package passkey
@@ -499,7 +501,7 @@ enable authentication with passkey token.
 %endif
 
 %prep
-%autosetup -n sssd-2.11.1 -p1
+%autosetup -n %{name}-%{version_no_tilde} -p1
 
 %build
 
@@ -534,9 +536,6 @@ autoreconf -ivf
 %endif
 %if %{build_ssh_known_hosts_proxy}
     --with-ssh-known-hosts-proxy \
-%endif
-%if ! %{build_idp}
-    --with-id-provider-idp=no
 %endif
     %{nil}
 
@@ -982,10 +981,8 @@ install -D -p -m 0644 %{SOURCE1} %{buildroot}%{_sysusersdir}/sssd.conf
 %{_mandir}/man8/sssd-kcm.8*
 
 %files idp
-%if %{build_idp}
 %{_libdir}/%{name}/libsss_idp.so
 %{_mandir}/man5/sssd-idp.5*
-%endif
 %{_libexecdir}/%{servicename}/oidc_child
 %{_libdir}/%{name}/modules/sssd_krb5_idp_plugin.so
 %{_datadir}/sssd/krb5-snippets/sssd_enable_idp
@@ -1093,9 +1090,34 @@ fi
 %systemd_postun_with_restart sssd.service
 
 %changelog
-* Tue Oct 21 2025 Sumit Bose <sbose@redhat.com> - 2.11.1-2.1
-- Resovles: RHEL-120288 - CVE-2025-11561 sssd: SSSD default Kerberos configuration allows
-  privilege escalation on AD-joined Linux systems [rhel-10.1.z]
+* Tue Apr 14 2026 Tomas Halman <thalman@redhat.com> - 2.12.0-3
+- Resolves: RHEL-167749 - SSSD IdP (Entra ID): listing group members does not work
+- Resolves: RHEL-167757 - sssd-kcm fails to start if krb5_renew_interval is specified
+
+* Thu Apr 2 2026 Tomas Halman <thalman@redhat.com> - 2.12.0-2
+- Resolves: RHEL-148232 - Failed to resolve indirect group-members of nested non-POSIX group
+
+* Thu Jan 15 2026 Sumit Bose <sbose@redhat.com> - 2.12.0-1
+- Resolves: RHEL-139110 - Rebase SSSD for RHEL 10.2
+- Resolves: RHEL-132552 - sssd_be: segfault at 8 ip 00007f6fd25b2b90 sp 00007ffc02dfbae0 error 4 in libsss_ipa.so[7f6fd25ae000+4d000]
+- Resolves: RHEL-132505 - RFE: package LDAP provider support for subid ranges
+- Resolves: RHEL-130571 - SSSD: change a default value of 'session_provider' sssd.conf option to 'none'
+- Resolves: RHEL-129636 - sssd service fails to start after updating to 2.9.6-4 or 2.9.7-4
+- Resolves: RHEL-128594 - 'sssd_nss' hangs when looking up an object by ID that has expired cache entry and filtered out by name
+- Resolves: RHEL-127792 - Remove SSSD option ipa_enable_dns_sites
+- Resolves: RHEL-120501 - Crash in 'sss_client/autofs/sss_autofs.c'
+- Resolves: RHEL-120287 - CVE-2025-11561 sssd: SSSD default Kerberos configuration allows privilege escalation on AD-joined Linux systems [rhel-10.2]
+- Resolves: RHEL-114468 - Spam in 'sssd_kcm.log' during normal operations
+- Resolves: RHEL-113111 - Including innapropriate IPv6 addresses in dyndns_update
+- Resolves: RHEL-104221 - The SSSD cache is filled with groups having GID=0, causing the cache index to grow excessively large. This, in turn, leads to timeouts
+- Resolves: RHEL-94545 - When the user name of an AD user in an IPA-AD trust environment overwritten, the user private group, the users primary group, cannot be lookup up by the overwritten name.
+- Resolves: RHEL-77184 - AD user in external group is not cleared when expiring the cache
+- Resolves: RHEL-72935 - sss_override does not work on AD UPN
+- Resolves: RHEL-11913 - GDM Support for IdM IdP feature and MFA [SSSD]
+- Resolves: RHEL-4990 - [RFE] SSSD support for Azure AD / Microsoft Entra ID (or general direct support of OIDC authentication)
+
+* Mon Sep 22 2025 Pavel Filipenský <pfilipen@redhat.com> - 2.11.1-3
+- Related: RHEL-114545 - Rebase Samba to the latest 4.23.x release
 
 * Thu Aug 14 2025 Alexey Tikhonov <atikhono@redhat.com> - 2.11.1-2
 - Related: RHEL-77184 - AD user in external group is not cleared when expiring the cache
