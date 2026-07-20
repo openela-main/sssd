@@ -21,7 +21,7 @@
 
 Name: sssd
 Version: 2.12.0
-Release: 3%{?dist}
+Release: 3%{?dist}.1
 Summary: System Security Services Daemon
 License: GPL-3.0-or-later
 URL: https://github.com/SSSD/sssd/
@@ -32,6 +32,8 @@ Source1: sssd.sysusers
 Patch1: 0001-do-not-require-GID-for-non-POSIX-group.patch
 Patch2: 0002-fix-use-after-free-in-kcm_read_options.patch
 Patch3: 0003-do-not-update-cache-timeout-if-member-is-added.patch
+Patch4: 0004-reject-path-traversal-in-gpcfilesyspath.patch
+Patch5: 0005-warn-when-ldap_sudo_search_base-fallback.patch
 
 ### Dependencies ###
 
@@ -1090,6 +1092,10 @@ fi
 %systemd_postun_with_restart sssd.service
 
 %changelog
+* Wed Jul 8 2026 - Tomas Halman <thalman@redhat.com> - 2.12.0-3.1
+- Resolves: RHEL-192056 - CVE-2026-14474 sssd: sssd: sudo LDAP provider searches entire directory tree for sudoRole
+- Resolves: RHEL-192064 - CVE-2026-14476 sssd: sssd: GPO cache path traversal via unsanitized gPCFileSysPath allows Kerberos authentication bypass
+
 * Tue Apr 14 2026 Tomas Halman <thalman@redhat.com> - 2.12.0-3
 - Resolves: RHEL-167749 - SSSD IdP (Entra ID): listing group members does not work
 - Resolves: RHEL-167757 - sssd-kcm fails to start if krb5_renew_interval is specified
