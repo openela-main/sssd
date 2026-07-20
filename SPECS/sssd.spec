@@ -27,7 +27,7 @@
 
 Name: sssd
 Version: 2.9.8
-Release: 4%{?dist}
+Release: 4%{?dist}.1
 Summary: System Security Services Daemon
 License: GPLv3+
 URL: https://github.com/SSSD/sssd/
@@ -37,6 +37,8 @@ Source0: https://github.com/SSSD/sssd/releases/download/%{version}/sssd-%{versio
 Patch1: 0001-do-not-require-GID-for-non-POSIX-group.patch
 Patch2: 0002-fix-use-after-free-in-kcm_read_options.patch
 Patch3: 0003-add-missing-include.patch
+Patch4: 0004-gpo-reject-path-traversal-in-gPCFileSysPath.patch
+Patch5: 0005-sudo-warn-when-ldap_sudo_search_base-falls-back-to-root-DN.patch
 
 ### Dependencies ###
 
@@ -1086,6 +1088,10 @@ fi
 %systemd_postun_with_restart sssd.service
 
 %changelog
+* Wed Jul 8 2026 Justin Stephenson <jstephen@redhat.com> - 2.9.8-5
+- Resolves: RHEL-192063 CVE-2026-14474 sssd: sudo ldap provider searches entire directory tree for sudorole objects by default, enabling privilege escalation
+- Resolves: RHEL-192070 CVE-2026-14476 sssd: path traversal in SSSD AD GPO provider allows writing files outside GPO cache directory as root
+
 * Wed Apr 15 2026 Tomas Halman <thalman@redhat.com> - 2.9.8-4
 - Resolves: RHEL-154804 Crash in 'sss_client/autofs/sss_autofs.c'
 
