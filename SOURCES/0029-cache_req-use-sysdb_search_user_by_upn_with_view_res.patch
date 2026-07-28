@@ -1,0 +1,48 @@
+From 5f53949d3fcc3bd8b02b2d79327a3cf303c76d38 Mon Sep 17 00:00:00 2001
+From: Sumit Bose <sbose@redhat.com>
+Date: Thu, 12 Jun 2025 19:49:42 +0200
+Subject: [PATCH 29/32] cache_req: use sysdb_search_user_by_upn_with_view_res()
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+To make sure any overrides are applied to the user even when searched by
+UPN or email address sysdb_search_user_by_upn_with_view_res() is now
+used in the cache request code.
+
+Reviewed-by: Alexey Tikhonov <atikhono@redhat.com>
+Reviewed-by: Pavel Březina <pbrezina@redhat.com>
+(cherry picked from commit 43f22b968a48c4e1f1e7cb885e68428baa7cc7be)
+---
+ .../cache_req/plugins/cache_req_user_by_upn.c     | 15 ++++++++-------
+ 1 file changed, 8 insertions(+), 7 deletions(-)
+
+diff --git a/src/responder/common/cache_req/plugins/cache_req_user_by_upn.c b/src/responder/common/cache_req/plugins/cache_req_user_by_upn.c
+index 037994c8c..cfcaf4916 100644
+--- a/src/responder/common/cache_req/plugins/cache_req_user_by_upn.c
++++ b/src/responder/common/cache_req/plugins/cache_req_user_by_upn.c
+@@ -84,13 +84,14 @@ cache_req_user_by_upn_lookup(TALLOC_CTX *mem_ctx,
+                              struct sss_domain_info *domain,
+                              struct ldb_result **_result)
+ {
+-    if (data->attrs == NULL) {
+-        return sysdb_getpwupn(mem_ctx, domain, true, data->name.lookup, _result);
+-    }
+-
+-    return sysdb_search_user_by_upn_res(mem_ctx, domain, true,
+-                                        data->name.lookup, data->attrs,
+-                                        _result);
++    static const char *def_attrs[] = SYSDB_PW_ATTRS;
++
++    return sysdb_search_user_by_upn_with_view_res(mem_ctx, domain, true,
++                                                  data->name.lookup,
++                                                  data->attrs == NULL
++                                                               ? def_attrs
++                                                               : data->attrs,
++                                                  _result);
+ }
+ 
+ static struct tevent_req *
+-- 
+2.54.0
+

@@ -19,7 +19,7 @@
 
 Name: sssd
 Version: 2.9.4
-Release: 5%{?dist}.4
+Release: 5%{?dist}.5
 Group: Applications/System
 Summary: System Security Services Daemon
 License: GPLv3+
@@ -53,6 +53,13 @@ Patch0023: 0023-sbus-defer-notification-callbacks.patch
 Patch0024: 0024-cache_req-allow-cache_first-mode-only-if-there-is-mo.patch
 Patch0025: 0025-RESPONDER-use-proper-context-for-getDomains.patch
 Patch0026: 0026-Enumerate-object-with-escaped-characters-in-name.patch
+Patch0027: 0027-Add-missing-include.patch
+Patch0028: 0028-sysdb-add-sysdb_search_user_by_upn_with_view_res.patch
+Patch0029: 0029-cache_req-use-sysdb_search_user_by_upn_with_view_res.patch
+Patch0030: 0030-sysdb-remove-sysdb_getpwupn.patch
+Patch0031: 0031-sysdb-do-not-treat-missing-id-override-as-an-error.patch
+Patch0032: 0032-sudo-warn-when-ldap_sudo_search_base-falls-back-to-r.patch
+Patch0033: 0033-gpo-reject-path-traversal-in-gPCFileSysPath.patch
 
 ### Downstream Patches ###
 
@@ -1237,6 +1244,12 @@ fi
 %systemd_postun_with_restart sssd.service
 
 %changelog
+* Wed Jul  8 2026 Alexey Tikhonov <atikhono@redhat.com> - 2.9.4-5.5
+- Resolves: RHEL-168415 - [Addition] Crash in 'sss_client/autofs/sss_autofs.c' [rhel-8.10.z]
+- Resolves: RHEL-168363 - sss_override does not work on AD UPN [rhel-8.10.z]
+- Resolves: RHEL-192053 - CVE-2026-14474: sudo LDAP provider searches entire directory tree for sudoRole objects by default, enabling privilege escalation [rhel-8.10.z]
+- Resolves: RHEL-192076 - CVE-2026-14476: GPO cache path traversal via unsanitized gPCFileSysPath allows Kerberos authentication bypass [rhel-8.10.z]
+
 * Mon Jan 26 2026 Alexey Tikhonov <atikhono@redhat.com> - 2.9.4-5.4
 - Resolves: RHEL-143731 - Crash in 'sss_client/autofs/sss_autofs.c' [rhel-8.10.z]
 - Resolves: RHEL-133476 - 'sssd_nss' hangs when looking up an object by ID that has expired cache entry and filtered out by name [rhel-8.10.z]

@@ -1,0 +1,31 @@
+From a13fcb20a9b8d1d0e7727d7793c7a6d2f0a696dd Mon Sep 17 00:00:00 2001
+From: Sumit Bose <sbose@redhat.com>
+Date: Mon, 5 Jan 2026 10:17:27 +0100
+Subject: [PATCH 32/32] sysdb: do not treat missing id-override as an error
+
+In sysdb_search_user_by_upn_with_view_res()
+sysdb_add_overrides_to_object() can return ENOENT if there is no
+id-override for the given user. This is expected and should not be
+treated as an error.
+
+Reviewed-by: Alexey Tikhonov <atikhono@redhat.com>
+(cherry picked from commit 72a42d5cbb969f61698f7403fe6e7cf6a8abf957)
+---
+ src/db/sysdb_ops.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/src/db/sysdb_ops.c b/src/db/sysdb_ops.c
+index b0e8060f9..dec1572f5 100644
+--- a/src/db/sysdb_ops.c
++++ b/src/db/sysdb_ops.c
+@@ -743,6 +743,7 @@ int sysdb_search_user_by_upn_with_view_res(TALLOC_CTX *mem_ctx,
+             DEBUG(SSSDBG_OP_FAILURE, "sysdb_add_overrides_to_object failed.\n");
+             return ret;
+         }
++        ret = EOK;
+     }
+ 
+     *out_res = orig_obj;
+-- 
+2.54.0
+
