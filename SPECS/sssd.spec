@@ -26,19 +26,18 @@
 %global samba_package_version %(rpm -q samba-devel --queryformat %{version})
 
 Name: sssd
-Version: 2.9.8
-Release: 4%{?dist}.1
+Version: 2.9.9
+Release: 3%{?dist}
 Summary: System Security Services Daemon
 License: GPLv3+
 URL: https://github.com/SSSD/sssd/
 Source0: https://github.com/SSSD/sssd/releases/download/%{version}/sssd-%{version}.tar.gz
 
 ### Patches ###
-Patch1: 0001-do-not-require-GID-for-non-POSIX-group.patch
-Patch2: 0002-fix-use-after-free-in-kcm_read_options.patch
-Patch3: 0003-add-missing-include.patch
-Patch4: 0004-gpo-reject-path-traversal-in-gPCFileSysPath.patch
-Patch5: 0005-sudo-warn-when-ldap_sudo_search_base-falls-back-to-root-DN.patch
+Patch1: 0001-passwordless-gdm.patch
+Patch2: 0002-sysdb-enumpwent-replacement.patch
+Patch3: 0003-gpo-reject-path-traversal-in-gPCFileSysPath.patch
+Patch4: 0004-sudo-warn-when-ldap_sudo_search_base-falls-back-to-root-DN.patch
 
 ### Dependencies ###
 
@@ -1088,9 +1087,23 @@ fi
 %systemd_postun_with_restart sssd.service
 
 %changelog
-* Wed Jul 8 2026 Justin Stephenson <jstephen@redhat.com> - 2.9.8-5
-- Resolves: RHEL-192063 CVE-2026-14474 sssd: sudo ldap provider searches entire directory tree for sudorole objects by default, enabling privilege escalation
-- Resolves: RHEL-192070 CVE-2026-14476 sssd: path traversal in SSSD AD GPO provider allows writing files outside GPO cache directory as root
+* Wed Jul 8 2026 Justin Stephenson <jstephen@redhat.com> - 2.9.9-3
+- Resolves: RHEL-192062 CVE-2026-14474 sssd: sudo ldap provider searches entire directory tree for sudorole objects by default, enabling privilege escalation
+- Resolves: RHEL-192072 CVE-2026-14476 sssd: path traversal in SSSD AD GPO provider allows writing files outside GPO cache directory as root
+
+* Thu Jun 4 2026 Pavel Březina <pbrezina@redhat.com> - 2.9.9-2
+- Rebuild against samba-4.24
+
+* Wed May  6 2026 Iker Pedrosa <ipedrosa@redhat.com> - 2.9.9-1
+- Resolves: RHEL-173741 - SSSD Rebase for RHEL 9.9
+- Resolves: RHEL-173740 - CVE-2026-6245 sssd: out-of-bounds read in the sssd
+- Resolves: RHEL-150439 - Poor performance of `BE_REQ_INITGROUPS` handling by 'sssd_be' (LDAP RFC2307, no nested groups)
+- Resolves: RHEL-143416 - Performance impact with enumerate in SSSD > 2.7.3
+- Resolves: RHEL-152067 - [RFE] SSSD PAM: Support Microsoft AD PKINIT authentication indicator (ms-pkca) for pam_gssapi_indicators_map
+- Resolves: RHEL-173742 - Man page update: man sssd_krb5_localauth_plugin – Missing disable = an2ln
+- Resolves: RHEL-173743 - Concurrent child processes trigger unnecessarily backtrace
+- Resolves: RHEL-173744 - Detect foreign security principals in AD group members and silently ignore them
+- Resolves: RHEL-156519 - GDM Support for IdM IdP feature and MFA [SSSD]
 
 * Wed Apr 15 2026 Tomas Halman <thalman@redhat.com> - 2.9.8-4
 - Resolves: RHEL-154804 Crash in 'sss_client/autofs/sss_autofs.c'
