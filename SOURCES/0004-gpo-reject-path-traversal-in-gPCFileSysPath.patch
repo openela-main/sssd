@@ -1,4 +1,4 @@
-From 3c1a31ab668b1ed7b97eb72d915a4187e549d86c Mon Sep 17 00:00:00 2001
+From 25bacdb4ad096bb753192da776c1b7bb9900710c Mon Sep 17 00:00:00 2001
 From: Alexey Tikhonov <atikhono@redhat.com>
 Date: Thu, 2 Jul 2026 17:29:51 +0200
 Subject: [PATCH] gpo: reject path traversal in gPCFileSysPath
@@ -47,7 +47,7 @@ Reviewed-by: Tomáš Halman <thalman@redhat.com>
  2 files changed, 96 insertions(+)
 
 diff --git a/src/providers/ad/ad_gpo.c b/src/providers/ad/ad_gpo.c
-index 952fa49a0e5..4dce4266580 100644
+index 5c2f117a5..b8562edc5 100644
 --- a/src/providers/ad/ad_gpo.c
 +++ b/src/providers/ad/ad_gpo.c
 @@ -3832,6 +3832,43 @@ ad_gpo_populate_candidate_gpos(TALLOC_CTX *mem_ctx,
@@ -112,7 +112,7 @@ index 952fa49a0e5..4dce4266580 100644
                                     SMB_STANDARD_URI,
                                     server_hostname);
 diff --git a/src/providers/ad/ad_gpo_child.c b/src/providers/ad/ad_gpo_child.c
-index 592509acf22..e5d7f2128af 100644
+index b8b47b09e..db3716fdf 100644
 --- a/src/providers/ad/ad_gpo_child.c
 +++ b/src/providers/ad/ad_gpo_child.c
 @@ -322,6 +322,55 @@ static errno_t gpo_cache_store_file(const char *smb_path,
@@ -171,3 +171,6 @@ index 592509acf22..e5d7f2128af 100644
      tmp_name = talloc_asprintf(tmp_ctx, "%sXXXXXX", filename);
      if (tmp_name == NULL) {
          DEBUG(SSSDBG_CRIT_FAILURE, "talloc_asprintf failed.\n");
+-- 
+2.54.0
+

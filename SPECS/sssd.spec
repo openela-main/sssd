@@ -20,22 +20,20 @@
 %global samba_package_version %(rpm -q samba-devel --queryformat %{version})
 
 Name: sssd
-Version: 2.12.0
-Release: 3%{?dist}.2
+Version: 2.13.1
+Release: 2%{?dist}
 Summary: System Security Services Daemon
 License: GPL-3.0-or-later
 URL: https://github.com/SSSD/sssd/
-Source0: https://github.com/SSSD/sssd/releases/download/2.12.0/sssd-2.12.0.tar.gz
+Source0: https://github.com/SSSD/sssd/releases/download/%{version}/sssd-%{version}.tar.gz
 Source1: sssd.sysusers
 
 ### Patches ###
-Patch1: 0001-do-not-require-GID-for-non-POSIX-group.patch
-Patch2: 0002-fix-use-after-free-in-kcm_read_options.patch
-Patch3: 0003-do-not-update-cache-timeout-if-member-is-added.patch
-Patch4: 0004-reject-path-traversal-in-gpcfilesyspath.patch
-Patch5: 0005-warn-when-ldap_sudo_search_base-fallback.patch
-# https://github.com/SSSD/sssd/commit/542411bb0b6e4171d9183fbf364d6cb52d848ad5
-Patch6: 0006-IDP-fix-user-matching-in-eval_access_token_buf.patch
+Patch1: 0001-pam-fix-use-after-free-during-p11_child-processing.patch
+Patch2: 0002-oidc_child-change-default-with-no-auth-method.patch
+Patch3: 0003-cfg_rules-allow-ldap_sasl_authid-in-subdomain.patch
+Patch4: 0004-gpo-reject-path-traversal-in-gPCFileSysPath.patch
+Patch5: 0005-sudo-warn-when-ldap_sudo_search_base-falls-back-to-root-DN.patch
 
 ### Dependencies ###
 
@@ -1094,12 +1092,32 @@ fi
 %systemd_postun_with_restart sssd.service
 
 %changelog
-* Sat Sep 12 2026 RHEL Packaging Agent <redhat-ymir-agent@redhat.com> - 2.12.0-3.2
-- Resolves: RHEL-257112 - CVE-2026-87853 sssd: IDP prefix-match bypass in eval_access_token_buf()
+* Thu Jul  2 2026 Madhuri Upadhye <mupadhye@redhat.com> - 2.13.1-2
+- Resolves: RHEL-190529 CVE-2026-12610 sssd: Use-after-free crash in SSSD' 'sssd_pam' process
+- Resolves: RHEL-185008 Regression in IPA + Idp authentication with keycloak
+- Resolves: RHEL-111571 'sssctl config-check' does not work correctly for "Accessing AD with a MSA"
+- Resolves: RHEL-192054 CVE-2026-14474 sssd: sudo ldap provider searches entire directory tree for sudorole objects by default, enabling privilege escalation
+- Resolves: RHEL-192069 CVE-2026-14476 sssd: path traversal in SSSD AD GPO provider allows writing files outside GPO cache directory as root
 
-* Wed Jul 8 2026 - Tomas Halman <thalman@redhat.com> - 2.12.0-3.1
-- Resolves: RHEL-192056 - CVE-2026-14474 sssd: sssd: sudo LDAP provider searches entire directory tree for sudoRole
-- Resolves: RHEL-192064 - CVE-2026-14476 sssd: sssd: GPO cache path traversal via unsanitized gPCFileSysPath allows Kerberos authentication bypass
+* Wed Jun 10 2026 Sumit Bose <sbose@redhat.com> - 2.13.1-1
+- Resolves: RHEL-183331 Rebase SSSD for RHEL 10.3
+- Resolves: RHEL-178180 'sssctl analyze --help' shows incorrect command in usage field
+- Resolves: RHEL-173663 [Regression] Cannot log in to FreeIPA account with password immediately after boot
+- Resolves: RHEL-173660 SSSD 2.13 doesn't work in offline mode, generates plenty of Permission denied errors
+- Resolves: RHEL-172303 SSSD: LDAP backend ('sssd_be') initialization fails if DNS in unresponsive
+- Resolves: RHEL-151491 SSSD kerberos plugins export symbols which clash
+- Resolves: RHEL-133013 /etc/hosts containing an entry with a name and alias but no IPv4 address results in sssd_be crash
+- Resolves: RHEL-5054 Smart card reader with pinpad fails C_Login. (CKF_PROTECTED_AUTHENTICATION_PATH not handled correctly)
+
+* Tue Apr 28 2026 Sumit Bose <sbose@redhat.com> - 2.13.0-1
+- Resolves: RHEL-167873 - CVE-2026-6245 sssd: out-of-bounds read in the sssd [rhel-10.3]
+- Resolves: RHEL-154156 - SSSD needs to add Plasma Login Manager to the PAM services whitelist for the AD provider
+- Resolves: RHEL-142964 - Poor performance of `BE_REQ_INITGROUPS` handling by 'sssd_be' (LDAP RFC2307, no nested groups)
+- Resolves: RHEL-138905 - [RFE] SSSD PAM: Support Microsoft AD PKINIT authentication indicator (ms-pkca) for pam_gssapi_indicators_map
+- Resolves: RHEL-123943 - Man page update: man sssd_krb5_localauth_plugin – Missing disable = an2ln
+- Resolves: RHEL-109754 - Performance impact with enumerate in SSSD > 2.7.3
+- Resolves: RHEL-108116 - Concurrent child processes trigger unnecessarily backtrace
+- Resolves: RHEL-5049 - Detect foreign security principals in AD group members and silently ignore them
 
 * Tue Apr 14 2026 Tomas Halman <thalman@redhat.com> - 2.12.0-3
 - Resolves: RHEL-167749 - SSSD IdP (Entra ID): listing group members does not work
@@ -2976,8 +2994,8 @@ fi
 
 * Mon Jun 21 2010 Stephen Gallagher <sgallagh@redhat.com> - 1.2.1-15
 - New stable upstream version 1.2.1
-- Resolves: rhbz#595529 - spec file should eschew %%define in favor of
--                         %%global
+- Resolves: rhbz#595529 - spec file should eschew define in favor of
+-                         global
 - Resolves: rhbz#593644 - Empty list of simple_allow_users causes sssd service
 -                         to fail while restart.
 - Resolves: rhbz#599026 - Makefile typo causes SSSD not to use the kernel

@@ -1,0 +1,54 @@
+From 9884f33477b3e280f37c41465eb28260fea8522c Mon Sep 17 00:00:00 2001
+From: Sumit Bose <sbose@redhat.com>
+Date: Mon, 15 Jun 2026 17:42:29 +0200
+Subject: [PATCH] oidc_child: change default with no auth method
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Before the new client-auth-method option was added oidc_child was
+accepting a client or nothing in case the IdP client is a public one.
+With the introduction of the client-auth-method option the default if
+not option was given was set the 'secret' which cause a regression for
+public clients.
+
+With this patch the old default behavior, accepting a secret or nothing,
+is restored.
+
+Reviewed-by: Alexey Tikhonov <atikhono@redhat.com>
+Reviewed-by: Pavel Březina <pbrezina@redhat.com>
+(cherry picked from commit 10bad8b1d74b53a90e10f0a7a74565d4272a01bf)
+---
+ src/oidc_child/oidc_child.c | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
+
+diff --git a/src/oidc_child/oidc_child.c b/src/oidc_child/oidc_child.c
+index 8aa7f7ea4..15e88d4da 100644
+--- a/src/oidc_child/oidc_child.c
++++ b/src/oidc_child/oidc_child.c
+@@ -410,7 +410,11 @@ static bool set_client_auth_method(const char *tmp_cam, struct cli_opts *opts)
+             return false;
+         }
+     } else {
+-        opts->client_auth_method = CAM_SECRET;
++        if (has_creds_client_secret(opts)) {
++            opts->client_auth_method = CAM_SECRET;
++        } else {
++            opts->client_auth_method = CAM_NONE;
++        }
+     }
+ 
+     switch (opts->client_auth_method) {
+@@ -502,7 +506,8 @@ static int parse_cli(int argc, const char *argv[], struct cli_opts *opts)
+         {"pkcs12-client-creds", 0, POPT_ARG_STRING, &opts->pkcs12_client_creds, 0,
+                 _("Client certificate and key in PKCS#12 format"), NULL},
+         {"client-auth-method", 0, POPT_ARG_STRING, &tmp_cam, 0,
+-                _("Authentication method against IdP [secret (default), mtls, jwt, none]"),
++                _("Authentication method against IdP [secret, mtls, jwt, none] "
++                  "(default: secret if client secret given, none otherwise)"),
+                 NULL},
+         {"ca-db", 0, POPT_ARG_STRING, &opts->ca_db, 0,
+                 _("Path to PEM file with CA certificates"), NULL},
+-- 
+2.54.0
+

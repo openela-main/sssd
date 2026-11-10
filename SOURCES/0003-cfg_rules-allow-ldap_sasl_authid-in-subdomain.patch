@@ -1,0 +1,37 @@
+From f0a3dbe607079d3501061dc8b60822a478dddfa3 Mon Sep 17 00:00:00 2001
+From: Alexey Tikhonov <atikhono@redhat.com>
+Date: Tue, 30 Jun 2026 20:30:24 +0200
+Subject: [PATCH] cfg_rules: allow
+ ldap_sasl_authid/ldap_krb5_keytab/krb5_keytab
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+in subdomain section.
+
+Note that there is a bug: those values are overwritten by domain's
+`krb5_keytab` option. But "by design" they are supposed to work.
+
+Reviewed-by: Tomáš Halman <thalman@redhat.com>
+(cherry picked from commit 27651161b625b9c2d748686893302b19df59750d)
+---
+ src/config/cfg_rules.ini | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/src/config/cfg_rules.ini b/src/config/cfg_rules.ini
+index 4ef0d0156..3d79f4374 100644
+--- a/src/config/cfg_rules.ini
++++ b/src/config/cfg_rules.ini
+@@ -831,6 +831,9 @@ option = ldap_group_search_base
+ option = ldap_netgroup_search_base
+ option = ldap_service_search_base
+ option = ldap_sasl_mech
++option = ldap_sasl_authid
++option = ldap_krb5_keytab
++option = krb5_keytab
+ option = ad_server
+ option = ad_backup_server
+ option = ad_site
+-- 
+2.54.0
+
