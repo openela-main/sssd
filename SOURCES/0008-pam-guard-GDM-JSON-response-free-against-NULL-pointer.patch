@@ -1,0 +1,56 @@
+From ea566338205e00c1bd1992ad860d6b99973492bc Mon Sep 17 00:00:00 2001
+From: Joan Torres Lopez <joantolo@redhat.com>
+Date: Sat, 4 Jul 2026 19:48:41 +0200
+Subject: [PATCH] pam: guard GDM JSON response free against NULL pointer
+
+Reviewed-by: Alexey Tikhonov <atikhono@redhat.com>
+Reviewed-by: Scott Poore <spoore@redhat.com>
+Reviewed-by: Sumit Bose <sbose@redhat.com>
+(cherry picked from commit 9a4833c15a12a7d5364b2e80631c5fe71251bf0d)
+---
+ src/sss_client/pam_sss.c | 20 ++++++++++++--------
+ 1 file changed, 12 insertions(+), 8 deletions(-)
+
+diff --git a/src/sss_client/pam_sss.c b/src/sss_client/pam_sss.c
+index bd181d0..607aa55 100644
+--- a/src/sss_client/pam_sss.c
++++ b/src/sss_client/pam_sss.c
+@@ -43,11 +43,13 @@
+ #ifndef GDM_PAM_EXTENSION_CHOICE_LIST_RESPONSE_FREE
+ #define GDM_PAM_EXTENSION_CHOICE_LIST_RESPONSE_FREE(response) \
+ { \
+-        if ((response)->key != NULL) { \
+-                sss_erase_mem_securely ((response)->key, strlen ((response)->key)); \
+-                free ((response)->key); \
++        if ((response) != NULL) { \
++                if ((response)->key != NULL) { \
++                        sss_erase_mem_securely ((response)->key, strlen ((response)->key)); \
++                        free ((response)->key); \
++                } \
++                free (response); \
+         } \
+-        free (response); \
+ }
+ #endif
+ #endif /* HAVE_GDM_PAM_EXTENSIONS */
+@@ -58,11 +60,13 @@
+ #ifndef GDM_PAM_EXTENSION_CUSTOM_JSON_RESPONSE_FREE
+ #define GDM_PAM_EXTENSION_CUSTOM_JSON_RESPONSE_FREE(response) \
+ { \
+-        if ((response)->json != NULL) { \
+-                sss_erase_mem_securely ((response)->json, strlen ((response)->json)); \
+-                free ((response)->json); \
++        if ((response) != NULL) { \
++                if ((response)->json != NULL) { \
++                        sss_erase_mem_securely ((response)->json, strlen ((response)->json)); \
++                        free ((response)->json); \
++                } \
++                free (response); \
+         } \
+-        free (response); \
+ }
+ #endif
+ #endif /* HAVE_GDM_CUSTOM_JSON_PAM_EXTENSION */
+-- 
+2.50.1 (Apple Git-155)
+

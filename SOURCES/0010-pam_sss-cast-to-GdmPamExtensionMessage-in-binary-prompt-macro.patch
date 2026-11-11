@@ -1,0 +1,58 @@
+From 4bc7ece9fba4bfe57d535ed76e7c289517d68a13 Mon Sep 17 00:00:00 2001
+From: Alexey Tikhonov <atikhono@redhat.com>
+Date: Thu, 27 Aug 2026 09:40:51 +0200
+Subject: [PATCH] pam_sss: cast to GdmPamExtensionMessage in binary prompt
+ macro
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+GDM's PAM extension headers were rewritten to replace the uppercase
+function-like macros with static inline functions. The re-added
+backwards-compatible GDM_PAM_EXTENSION_MESSAGE_TO_BINARY_PROMPT_MESSAGE
+macro forwards its argument to the strongly-typed
+gdm_pam_extension_message_to_binary_prompt_message(GdmPamExtensionMessage *)
+without a cast, whereas the original macro cast it to void *.
+
+Cast the request to GdmPamExtensionMessage * at the call sites so the
+code is correct regardless of header variant used.
+
+Assisted-By: Claude Code (Opus 4.8)
+Reviewed-by: Sumit Bose <sbose@redhat.com>
+Reviewed-by: Tomáš Halman <thalman@redhat.com>
+(cherry picked from commit e1e171d8f7ef820cd7147cc6abd7f76ce192985c)
+---
+ src/sss_client/pam_sss.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
+
+diff --git a/src/sss_client/pam_sss.c b/src/sss_client/pam_sss.c
+index d2b68de..af655b1 100644
+--- a/src/sss_client/pam_sss.c
++++ b/src/sss_client/pam_sss.c
+@@ -2205,8 +2205,9 @@ static int auth_selection_conversation_gdm(pam_handle_t *pamh,
+ 
+     GDM_PAM_EXTENSION_CUSTOM_JSON_REQUEST_INIT(request, "auth-mechanisms", 1,
+                                                pi->json_auth_msg);
+-    GDM_PAM_EXTENSION_MESSAGE_TO_BINARY_PROMPT_MESSAGE(request,
+-                                                       &prompt_message);
++    GDM_PAM_EXTENSION_MESSAGE_TO_BINARY_PROMPT_MESSAGE(
++                                        (GdmPamExtensionMessage *)request,
++                                        &prompt_message);
+     prompt_messages[0] = &prompt_message;
+ 
+     ret = conv->conv(1, prompt_messages, &reply, conv->appdata_ptr);
+@@ -2309,8 +2310,9 @@ static int prompt_multi_cert_gdm(pam_handle_t *pamh, struct pam_items *pi)
+         request->list.items[c++].text = prompt;
+     }
+ 
+-    GDM_PAM_EXTENSION_MESSAGE_TO_BINARY_PROMPT_MESSAGE(request,
+-                                                       &prompt_message);
++    GDM_PAM_EXTENSION_MESSAGE_TO_BINARY_PROMPT_MESSAGE(
++                                        (GdmPamExtensionMessage *)request,
++                                        &prompt_message);
+     prompt_messages[0] = &prompt_message;
+ 
+     ret = conv->conv(1, prompt_messages, &reply, conv->appdata_ptr);
+-- 
+2.50.1 (Apple Git-155)
+

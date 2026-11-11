@@ -21,7 +21,7 @@
 
 Name: sssd
 Version: 2.13.1
-Release: 2%{?dist}
+Release: 3%{?dist}
 Summary: System Security Services Daemon
 License: GPL-3.0-or-later
 URL: https://github.com/SSSD/sssd/
@@ -34,6 +34,12 @@ Patch2: 0002-oidc_child-change-default-with-no-auth-method.patch
 Patch3: 0003-cfg_rules-allow-ldap_sasl_authid-in-subdomain.patch
 Patch4: 0004-gpo-reject-path-traversal-in-gPCFileSysPath.patch
 Patch5: 0005-sudo-warn-when-ldap_sudo_search_base-falls-back-to-root-DN.patch
+Patch6: 0006-sudo-dont-warn-about-search-base-when-set-by-provider.patch
+Patch7: 0007-pam-forward-GDM_AUTH_SESSION_ID-from-PAM-client-to-child-processes.patch
+Patch8: 0008-pam-guard-GDM-JSON-response-free-against-NULL-pointer.patch
+Patch9: 0009-polkit-Add-rule-for-gnome-remote-desktop-pcscd-access.patch
+Patch10: 0010-pam_sss-cast-to-GdmPamExtensionMessage-in-binary-prompt-macro.patch
+Patch11: 0011-idp-fix-user-matching-in-eval_access_token_buf.patch
 
 ### Dependencies ###
 
@@ -1092,6 +1098,11 @@ fi
 %systemd_postun_with_restart sssd.service
 
 %changelog
+* Tue Sep  8 2026 Madhuri Upadhye <mupadhye@redhat.com> - 2.13.1-3
+- Resolves: RHEL-248164 Spurious warnings about `ldap_sudo_search_base`
+- Resolves: RHEL-188425 pam: Forward environment variables from PAM client to p11_child
+- Resolves: RHEL-257113 CVE-2026-87853 sssd: IdP authentication prefix comparison allows cross-user impersonation
+
 * Thu Jul  2 2026 Madhuri Upadhye <mupadhye@redhat.com> - 2.13.1-2
 - Resolves: RHEL-190529 CVE-2026-12610 sssd: Use-after-free crash in SSSD' 'sssd_pam' process
 - Resolves: RHEL-185008 Regression in IPA + Idp authentication with keycloak

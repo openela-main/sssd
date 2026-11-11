@@ -1,0 +1,43 @@
+From 71323d7af306337bb21d289d182648ef2b9407d0 Mon Sep 17 00:00:00 2001
+From: Joan Torres Lopez <joantolo@redhat.com>
+Date: Tue, 7 Jul 2026 18:30:44 +0200
+Subject: [PATCH] polkit: Add rule for gnome-remote-desktop pcscd access
+
+gnome-remote-desktop exposes a virtual PC/SC daemon (grd-pcscd) over
+D-Bus for smartcard redirection. Access to its session interface is
+restricted by a polkit action (org.gnome.remotedesktop.use-grd-pcscd).
+
+Grant the sssd user this action so that child processes like p11_child
+and krb5_child can access the virtual smartcard reader during
+authentication over RDP.
+
+:relnote: Added polkit rule to grant the sssd user access to the
+gnome-remote-desktop virtual PC/SC daemon (grd-pcscd), enabling
+smartcard authentication over RDP sessions.
+
+Reviewed-by: Alexey Tikhonov <atikhono@redhat.com>
+Reviewed-by: Scott Poore <spoore@redhat.com>
+Reviewed-by: Sumit Bose <sbose@redhat.com>
+(cherry picked from commit b1f2ffc7d3f74d5fd1c0091d98c19f5401b4013b)
+---
+ contrib/sssd-pcsc.rules.in | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/contrib/sssd-pcsc.rules.in b/contrib/sssd-pcsc.rules.in
+index 31d2dbe..6a4dcd1 100644
+--- a/contrib/sssd-pcsc.rules.in
++++ b/contrib/sssd-pcsc.rules.in
+@@ -13,3 +13,10 @@ polkit.addRule(function(action, subject) {
+             return polkit.Result.YES;
+     }
+ });
++
++polkit.addRule(function(action, subject) {
++    if (action.id == "org.gnome.remotedesktop.use-grd-pcscd" &&
++        subject.user == "@SSSD_USER@") {
++            return polkit.Result.YES;
++    }
++});
+-- 
+2.50.1 (Apple Git-155)
+
